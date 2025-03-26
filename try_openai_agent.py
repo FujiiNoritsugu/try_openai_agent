@@ -1,11 +1,22 @@
-from openai import OpenAI
 import json
 import traceback
 import asyncio
 from dotenv import load_dotenv
+from agents import Agent, Runner
+from pydantic import BaseModel
 
-SPEAKER_ID_CHATGPT = 0
-FETCH_INTERVAL = 1  # 1秒ごとにリクエストを送信
+
+class Emotion(BaseModel):
+    joy: float
+    fun: float
+    anger: float
+    sad: float
+
+
+class Response(BaseModel):
+    emotion: Emotion
+    message: str
+
 
 touched_area = "胸"
 
@@ -42,28 +53,21 @@ async def interact(data: str):
     global openai_client
 
     try:
-        system_prompt = make_system_prompt()
-        completion = openai_client.chat.completions.create(
+        agent = Agent(
+            name="Pom",
+            instructions=make_system_prompt(),
             model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": data,
-                },
-            ],
+            output_type=Response,
         )
-        temp = completion.choices[0].message.content
-        print(temp)
-        response = json.loads(temp)
-        response_message = response["message"]
-        response_emotion = response["emotion"]
+        result = await Runner.run(agent, "0.8")
+
+        response: Response = result.final_output
+        response_message = response.message
+        response_emotion = response.emotion.model_dump()
         highest_emotion = max(response_emotion, key=response_emotion.get)
 
         print(response_message)
+        print(response_emotion)
         print(highest_emotion)
 
     except Exception as e:
@@ -73,10 +77,6 @@ async def interact(data: str):
 
 # .envファイルからAPIキーを読み込む
 load_dotenv()
-
-global openai_client
-openai_client = OpenAI()
-
 
 if __name__ == "__main__":
     asyncio.run(interact("0.5"))
