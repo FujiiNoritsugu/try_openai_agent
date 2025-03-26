@@ -2,6 +2,7 @@ from openai import OpenAI
 import json
 import traceback
 import asyncio
+from dotenv import load_dotenv
 
 SPEAKER_ID_CHATGPT = 0
 FETCH_INTERVAL = 1  # 1秒ごとにリクエストを送信
@@ -70,15 +71,12 @@ async def interact(data: str):
         traceback.print_exc()
 
 
-# メイン処理
-# ファイルを開く
-with open("../chat_gpt_api_key", "r") as file:
-    # ファイルからデータを読み込む
-    data = file.read().strip()
+# .envファイルからAPIキーを読み込む
+load_dotenv()
 
 global openai_client
-openai_client = OpenAI(api_key=data)
+openai_client = OpenAI()
 
 
 if __name__ == "__main__":
-    asyncio.run(interact(0.5))
+    asyncio.run(interact("0.5"))
