@@ -114,14 +114,16 @@ async def interact(data: str):
 
         result = await Runner.run(main_agent, "0.9")
 
-        response: Response = result.final_output
-        response_message = response.message
-        response_emotion = response.emotion.model_dump()
-        highest_emotion = max(response_emotion, key=response_emotion.get)
+        for res in result.raw_responses:
+            print(f"Response {res}")
+        # response: Response = result.final_output
+        # response_message = response.message
+        # response_emotion = response.emotion.model_dump()
+        # highest_emotion = max(response_emotion, key=response_emotion.get)
 
-        print(response_message)
-        print(response_emotion)
-        print(highest_emotion)
+        # print(response_message)
+        # print(response_emotion)
+        # print(highest_emotion)
 
     except Exception as e:
         print(f"Error occurred: {e}")  # これでOpenAIのエラーもキャッチ
