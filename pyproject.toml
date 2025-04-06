@@ -1,7 +1,7 @@
 [project]
 name = "try-openai-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "OpenAI agent pipeline for emotion-based responses"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,3 +9,13 @@ dependencies = [
     "openai>=1.68.2",
     "openai-agents>=0.0.7",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.1.0",
+    "pytest>=7.3.1",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
