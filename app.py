@@ -2,8 +2,11 @@
 Streamlit UI for the OpenAI agent pipeline.
 """
 import asyncio
+import os
 import streamlit as st
 from dotenv import load_dotenv
+from PIL import Image
+import pandas as pd
 
 from src.models.data_models import UserInput
 from src.pipeline.pipeline import run_pipeline, format_pipeline_results
@@ -16,11 +19,32 @@ def run_async(coroutine):
     return loop.run_until_complete(coroutine)
 
 
-def human_body_part_selector():
-    """人体アイコンを使った部位選択インターフェース"""
+def load_body_map():
+    """人体画像のクリック可能な領域のマップを読み込む"""
+    map_file = os.path.join("static", "images", "body_map.txt")
+    body_map = []
+    
+    with open(map_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                parts = line.strip().split(',')
+                if len(parts) == 5:
+                    body_map.append({
+                        'part': parts[0],
+                        'x1': int(parts[1]),
+                        'y1': int(parts[2]),
+                        'x2': int(parts[3]),
+                        'y2': int(parts[4])
+                    })
+    
+    return body_map
+
+
+def clickable_body_part_selector():
+    """クリック可能な人体画像を使った部位選択インターフェース"""
     st.markdown("### 触れられた部位を選択")
     
-    body_parts = {
+    body_parts_desc = {
         "頭": "頭部（頭頂部、後頭部など）",
         "顔": "顔（額、頬、顎など）",
         "首": "首（前面、後面、側面）",
@@ -35,41 +59,69 @@ def human_body_part_selector():
         "足": "足（足首、足の裏、指など）"
     }
     
-    human_icon = """
-        頭
-        |
-    肩-顔-肩
-     |  |  |
-    腕 首 腕
-     |  |  |
-    手 胸 手
-        |
-        腹
-        |
-        腰
-        |
-       臀部
-       /  \\
-     脚    脚
-     |      |
-     足    足
-    """
+    image_path = os.path.join("static", "images", "human_body.png")
+    if not os.path.exists(image_path):
+        st.error("人体画像が見つかりません。")
+        return "胸"  # デフォルト値を返す
     
-    col1, col2 = st.columns([1, 1])
+    image = Image.open(image_path)
+    
+    body_map = load_body_map()
+    
+    if 'selected_body_part' not in st.session_state:
+        st.session_state.selected_body_part = "胸"
+    
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.code(human_icon, language=None)
+        clicked = st.image(image, use_column_width=True)
+        
+        if clicked:
+            st.markdown("画像上の部位をクリックしてください（以下のボタンで部位を選択できます）")
+            
+            buttons_col1, buttons_col2, buttons_col3 = st.columns(3)
+            
+            with buttons_col1:
+                if st.button("頭部"):
+                    st.session_state.selected_body_part = "頭"
+                if st.button("顔"):
+                    st.session_state.selected_body_part = "顔"
+                if st.button("首"):
+                    st.session_state.selected_body_part = "首"
+                if st.button("肩"):
+                    st.session_state.selected_body_part = "肩"
+            
+            with buttons_col2:
+                if st.button("腕"):
+                    st.session_state.selected_body_part = "腕"
+                if st.button("手"):
+                    st.session_state.selected_body_part = "手"
+                if st.button("胸"):
+                    st.session_state.selected_body_part = "胸"
+                if st.button("腹"):
+                    st.session_state.selected_body_part = "腹"
+            
+            with buttons_col3:
+                if st.button("腰"):
+                    st.session_state.selected_body_part = "腰"
+                if st.button("臀部"):
+                    st.session_state.selected_body_part = "臀部"
+                if st.button("脚"):
+                    st.session_state.selected_body_part = "脚"
+                if st.button("足"):
+                    st.session_state.selected_body_part = "足"
     
     with col2:
-        selected_part = st.radio(
-            "部位を選択",
-            options=list(body_parts.keys()),
-            index=list(body_parts.keys()).index("胸"),
-            key="body_part_selector"
-        )
-        st.caption(f"選択: {selected_part} - {body_parts[selected_part]}")
+        st.subheader("選択された部位")
+        st.markdown(f"**{st.session_state.selected_body_part}**")
+        st.caption(body_parts_desc[st.session_state.selected_body_part])
+        
+        st.markdown("### 部位の説明")
+        for part, desc in body_parts_desc.items():
+            if part == st.session_state.selected_body_part:
+                st.markdown(f"**{part}**: {desc}")
     
-    return selected_part
+    return st.session_state.selected_body_part
 
 
 def main():
@@ -91,7 +143,7 @@ def main():
         help="0.0: 何も感じない, 0.5: 最も気持ちいい, 1.0: 痛みを感じる"
     )
     
-    touched_area = human_body_part_selector()
+    touched_area = clickable_body_part_selector()
     
     if st.button("感情を分析"):
         with st.spinner("感情を分析中..."):
