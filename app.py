@@ -16,6 +16,62 @@ def run_async(coroutine):
     return loop.run_until_complete(coroutine)
 
 
+def human_body_part_selector():
+    """人体アイコンを使った部位選択インターフェース"""
+    st.markdown("### 触れられた部位を選択")
+    
+    body_parts = {
+        "頭": "頭部（頭頂部、後頭部など）",
+        "顔": "顔（額、頬、顎など）",
+        "首": "首（前面、後面、側面）",
+        "肩": "肩（左右の肩、肩甲骨など）",
+        "腕": "腕（上腕、前腕など）",
+        "手": "手（手のひら、指、手首など）",
+        "胸": "胸部（胸骨、乳房など）",
+        "腹": "腹部（上腹部、下腹部など）",
+        "腰": "腰部（腰椎周辺）",
+        "臀部": "臀部（お尻）",
+        "脚": "脚（太もも、ふくらはぎなど）",
+        "足": "足（足首、足の裏、指など）"
+    }
+    
+    human_icon = """
+        頭
+        |
+    肩-顔-肩
+     |  |  |
+    腕 首 腕
+     |  |  |
+    手 胸 手
+        |
+        腹
+        |
+        腰
+        |
+       臀部
+       /  \\
+     脚    脚
+     |      |
+     足    足
+    """
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.code(human_icon, language=None)
+    
+    with col2:
+        selected_part = st.radio(
+            "部位を選択",
+            options=list(body_parts.keys()),
+            index=list(body_parts.keys()).index("胸"),
+            key="body_part_selector"
+        )
+        st.caption(f"選択: {selected_part} - {body_parts[selected_part]}")
+    
+    return selected_part
+
+
 def main():
     """Main function for the Streamlit UI."""
     st.title("感情エージェントパイプライン")
@@ -35,8 +91,7 @@ def main():
         help="0.0: 何も感じない, 0.5: 最も気持ちいい, 1.0: 痛みを感じる"
     )
     
-    body_parts = ["頭", "顔", "首", "肩", "腕", "手", "胸", "腹", "腰", "臀部", "脚", "足"]
-    touched_area = st.selectbox("触れられた部位", body_parts, index=body_parts.index("胸"))
+    touched_area = human_body_part_selector()
     
     if st.button("感情を分析"):
         with st.spinner("感情を分析中..."):
