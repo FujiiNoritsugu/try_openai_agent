@@ -20,7 +20,20 @@ except ImportError:
         """Stub implementation of Runner class."""
         @staticmethod
         async def run(agent, input, context=None):
-            """Stub implementation of run method."""
-            raise NotImplementedError(
-                "Runner.run is not implemented. Please install openai_agents package."
-            )
+            """Stub implementation of run method that returns mock data."""
+            import json
+            from ..models.data_models import OriginalOutput, HandoffOutput
+            
+            if agent.name == "emotion_agent":
+                return OriginalOutput(
+                    emotion={"joy": 0.5, "fun": 0.5, "anger": 0.0, "sad": 0.0},
+                    message="これは感情抽出エージェントからのモックレスポンスです。"
+                )
+            elif agent.name == "classification_agent":
+                return "joy"
+            elif agent.name in ["joy_agent", "anger_agent", "sorrow_agent", "pleasure_agent"]:
+                return HandoffOutput(
+                    message=f"これは{agent.name}からのモックレスポンスです。実際のOpenAIエージェントをインストールすると、より適切な応答が生成されます。"
+                )
+            else:
+                return f"モックレスポンス: {agent.name}からの応答です。入力: {input}"
