@@ -66,50 +66,46 @@ def clickable_body_part_selector():
     
     image = Image.open(image_path)
     
-    body_map = load_body_map()
-    
     if 'selected_body_part' not in st.session_state:
         st.session_state.selected_body_part = "胸"
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        clicked = st.image(image, use_column_width=True)
+        st.image(image, use_container_width=True)
+        st.markdown("以下のボタンで部位を選択してください")
         
-        if clicked:
-            st.markdown("画像上の部位をクリックしてください（以下のボタンで部位を選択できます）")
-            
-            buttons_col1, buttons_col2, buttons_col3 = st.columns(3)
-            
-            with buttons_col1:
-                if st.button("頭部"):
-                    st.session_state.selected_body_part = "頭"
-                if st.button("顔"):
-                    st.session_state.selected_body_part = "顔"
-                if st.button("首"):
-                    st.session_state.selected_body_part = "首"
-                if st.button("肩"):
-                    st.session_state.selected_body_part = "肩"
-            
-            with buttons_col2:
-                if st.button("腕"):
-                    st.session_state.selected_body_part = "腕"
-                if st.button("手"):
-                    st.session_state.selected_body_part = "手"
-                if st.button("胸"):
-                    st.session_state.selected_body_part = "胸"
-                if st.button("腹"):
-                    st.session_state.selected_body_part = "腹"
-            
-            with buttons_col3:
-                if st.button("腰"):
-                    st.session_state.selected_body_part = "腰"
-                if st.button("臀部"):
-                    st.session_state.selected_body_part = "臀部"
-                if st.button("脚"):
-                    st.session_state.selected_body_part = "脚"
-                if st.button("足"):
-                    st.session_state.selected_body_part = "足"
+        buttons_col1, buttons_col2, buttons_col3 = st.columns(3)
+        
+        with buttons_col1:
+            if st.button("頭", key="btn_head"):
+                st.session_state.selected_body_part = "頭"
+            if st.button("顔", key="btn_face"):
+                st.session_state.selected_body_part = "顔"
+            if st.button("首", key="btn_neck"):
+                st.session_state.selected_body_part = "首"
+            if st.button("肩", key="btn_shoulder"):
+                st.session_state.selected_body_part = "肩"
+        
+        with buttons_col2:
+            if st.button("腕", key="btn_arm"):
+                st.session_state.selected_body_part = "腕"
+            if st.button("手", key="btn_hand"):
+                st.session_state.selected_body_part = "手"
+            if st.button("胸", key="btn_chest"):
+                st.session_state.selected_body_part = "胸"
+            if st.button("腹", key="btn_abdomen"):
+                st.session_state.selected_body_part = "腹"
+        
+        with buttons_col3:
+            if st.button("腰", key="btn_waist"):
+                st.session_state.selected_body_part = "腰"
+            if st.button("臀部", key="btn_hip"):
+                st.session_state.selected_body_part = "臀部"
+            if st.button("脚", key="btn_leg"):
+                st.session_state.selected_body_part = "脚"
+            if st.button("足", key="btn_foot"):
+                st.session_state.selected_body_part = "足"
     
     with col2:
         st.subheader("選択された部位")
@@ -117,9 +113,7 @@ def clickable_body_part_selector():
         st.caption(body_parts_desc[st.session_state.selected_body_part])
         
         st.markdown("### 部位の説明")
-        for part, desc in body_parts_desc.items():
-            if part == st.session_state.selected_body_part:
-                st.markdown(f"**{part}**: {desc}")
+        st.markdown(f"**{st.session_state.selected_body_part}**: {body_parts_desc[st.session_state.selected_body_part]}")
     
     return st.session_state.selected_body_part
 
