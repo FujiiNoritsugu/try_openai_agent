@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from agents import Agent, Runner
+from openai_agents import Agent, Runner
 from dotenv import load_dotenv
 
 

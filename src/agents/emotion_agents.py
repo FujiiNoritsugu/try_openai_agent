@@ -1,8 +1,13 @@
 """
 Emotion agents for the OpenAI agent pipeline.
 """
-from agents import Agent
-from agents.extensions.handoff_prompt import prompt_with_handoff_instructions
+try:
+    from openai_agents import Agent
+    from openai_agents.extensions.handoff_prompt import prompt_with_handoff_instructions
+except ImportError:
+    from .agents import Agent
+    def prompt_with_handoff_instructions(instructions, handoffs):
+        return instructions
 from ..models.data_models import PipelineContext, HandoffOutput, OriginalOutput
 
 EMOTION_AGENT_INSTRUCTION = """

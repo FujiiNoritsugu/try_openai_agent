@@ -5,7 +5,10 @@ import json
 import traceback
 from typing import Dict, Any, Optional, Tuple
 
-from agents import Runner
+try:
+    from openai_agents import Runner
+except ImportError:
+    from ..agents.agents import Runner
 from ..models.data_models import (
     UserInput, 
     PipelineContext, 
@@ -45,6 +48,10 @@ async def run_pipeline(
         ctx.emotion = final_output.emotion
         ctx.original_message = final_output.message
         
+        if ctx.emotion is None:
+            error = Exception("Emotion extraction failed")
+            return ctx, error
+            
         result2 = await Runner.run(
             classification_agent,
             input=json.dumps(ctx.emotion.model_dump()),
@@ -72,9 +79,14 @@ def format_pipeline_results(ctx: PipelineContext) -> Dict[str, Any]:
     Returns:
         A dictionary with formatted results.
     """
+    try:
+        extracted_emotion = ctx.emotion.model_dump() if ctx.emotion else None
+    except Exception as e:
+        extracted_emotion = {"error": f"Failed to extract emotion: {str(e)}"}
+        
     return {
-        "extracted_emotion": ctx.emotion.model_dump() if ctx.emotion else None,
-        "original_message": ctx.original_message,
-        "emotion_category": ctx.emotion_category,
-        "final_message": ctx.modified_message,
+        "extracted_emotion": extracted_emotion,
+        "original_message": ctx.original_message or "",
+        "emotion_category": ctx.emotion_category or "",
+        "final_message": ctx.modified_message or "",
     }
