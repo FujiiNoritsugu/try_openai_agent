@@ -2,7 +2,7 @@
 Data models for the OpenAI agent pipeline.
 """
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 
 class Emotion(BaseModel):
@@ -38,3 +38,5 @@ class PipelineContext(BaseModel):
     original_message: str = ""  # エージェント1が導出した元のメッセージ
     emotion_category: str = ""  # エージェント2が分類した喜怒哀楽カテゴリ
     modified_message: str = ""  # エージェント3が生成した最終メッセージ
+    is_learned_response: bool = False  # 学習データに基づいた応答かどうか
+    metadata: Dict[str, Any] = {}  # 追加のメタデータ
