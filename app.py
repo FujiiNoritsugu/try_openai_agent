@@ -265,13 +265,21 @@ def main():
             help="0.0: 何も感じない, 0.5: 最も気持ちいい, 1.0: 痛みを感じる"
         )
         
+        gender = st.radio(
+            "性別",
+            options=["男性", "女性", "その他"],
+            index=0,
+            horizontal=True,
+            help="システムが回答する際の性別を選択します"
+        )
+        
         touched_area = clickable_body_part_selector()
         
         use_learning = st.checkbox("学習データを使用", value=True, help="チェックすると、過去のフィードバックに基づいた学習データを使用します")
         
         if st.button("感情を分析"):
             with st.spinner("感情を分析中..."):
-                user_input = UserInput(data=str(data_value), touched_area=touched_area)
+                user_input = UserInput(data=str(data_value), touched_area=touched_area, gender=gender)
                 
                 emotion_learner = None
                 if use_learning:
