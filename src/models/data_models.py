@@ -17,6 +17,7 @@ class UserInput(BaseModel):
     """User input model with data and touched area."""
     data: str
     touched_area: str
+    gender: str = "男性"  # デフォルト値は「男性」
 
 
 class OriginalOutput(BaseModel):

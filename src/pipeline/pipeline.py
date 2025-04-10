@@ -46,8 +46,13 @@ async def run_pipeline(
             ctx.original_message = "学習データに基づいた感情応答です。"
             ctx.is_learned_response = True
         else:
+            gender = user_input.gender
+            
+            emotion_agent_inst = emotion_agent.instructions.format(gender=gender)
+            emotion_agent_with_gender = emotion_agent.model_copy(update={"instructions": emotion_agent_inst})
+            
             result1 = await Runner.run(
-                emotion_agent, 
+                emotion_agent_with_gender, 
                 json.dumps(user_input.model_dump()), 
                 context=ctx
             )
@@ -57,8 +62,18 @@ async def run_pipeline(
             ctx.original_message = final_output.message
             ctx.is_learned_response = False
         
+        classification_agent_inst = classification_agent.instructions
+        classification_agent_with_gender = classification_agent.model_copy()
+        
+        emotion_handoffs = []
+        for agent in classification_agent.handoffs:
+            agent_inst = agent.instructions.format(gender=gender)
+            emotion_handoffs.append(agent.model_copy(update={"instructions": agent_inst}))
+        
+        classification_agent_with_gender.handoffs = emotion_handoffs
+        
         result2 = await Runner.run(
-            classification_agent,
+            classification_agent_with_gender,
             input=json.dumps(ctx.emotion.model_dump()),
             context=ctx,
         )
