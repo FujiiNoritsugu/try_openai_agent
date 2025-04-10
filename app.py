@@ -3,13 +3,19 @@ Streamlit UI for the OpenAI agent pipeline.
 """
 import asyncio
 import os
+import json
 import streamlit as st
 from dotenv import load_dotenv
 from PIL import Image
 import pandas as pd
+from uuid import uuid4
+from datetime import datetime
 
-from src.models.data_models import UserInput
+from src.models.data_models import UserInput, Emotion
+from src.models.feedback_models import UserFeedback
 from src.pipeline.pipeline import run_pipeline, format_pipeline_results
+from src.learning.feedback_collector import FeedbackCollector
+from src.learning.emotion_learner import EmotionLearner
 
 
 def run_async(coroutine):
@@ -118,54 +124,244 @@ def clickable_body_part_selector():
     return st.session_state.selected_body_part
 
 
+def display_emotion_visualization(emotion_data):
+    """感情データの可視化を表示する"""
+    if emotion_data and isinstance(emotion_data, dict) and all(k in emotion_data for k in ["joy", "fun", "anger", "sad"]):
+        st.subheader("感情レーダーチャート")
+        
+        chart_data = pd.DataFrame(
+            {
+                "感情": ["喜び", "楽しさ", "怒り", "悲しみ"],
+                "値": [emotion_data["joy"], emotion_data["fun"], emotion_data["anger"], emotion_data["sad"]],
+            }
+        )
+        
+        st.write("感情パラメータの視覚化:")
+        
+        st.bar_chart(chart_data.set_index("感情"))
+        
+        dominant_emotion = max(emotion_data.items(), key=lambda x: x[1])
+        st.write(f"最も強い感情: **{dominant_emotion[0]}** (強さ: {dominant_emotion[1]})")
+        
+        positive = emotion_data["joy"] + emotion_data["fun"]
+        negative = emotion_data["anger"] + emotion_data["sad"]
+        
+        st.write(f"ポジティブ感情 (喜び+楽しさ): **{positive}**")
+        st.write(f"ネガティブ感情 (怒り+悲しみ): **{negative}**")
+
+
+def collect_feedback(user_input, emotion, results):
+    """ユーザーからのフィードバックを収集する"""
+    st.subheader("フィードバック")
+    st.write("この感情応答の正確さを評価してください:")
+    
+    col1, col2 = st.columns([3, 2])
+    
+    with col1:
+        accuracy_rating = st.slider(
+            "正確さ評価", 
+            min_value=1, 
+            max_value=5, 
+            value=3, 
+            step=1,
+            help="1: 全く正確でない, 5: 非常に正確"
+        )
+        
+        comments = st.text_area(
+            "コメント (任意)",
+            placeholder="この感情応答についてのコメントを入力してください..."
+        )
+    
+    with col2:
+        st.write("期待する感情値 (任意):")
+        expected_joy = st.slider("喜び", min_value=0, max_value=5, value=emotion.joy, step=1)
+        expected_fun = st.slider("楽しさ", min_value=0, max_value=5, value=emotion.fun, step=1)
+        expected_anger = st.slider("怒り", min_value=0, max_value=5, value=emotion.anger, step=1)
+        expected_sad = st.slider("悲しみ", min_value=0, max_value=5, value=emotion.sad, step=1)
+    
+    if st.button("フィードバックを送信"):
+        feedback = UserFeedback(
+            user_input=user_input,
+            generated_emotion=emotion,
+            accuracy_rating=accuracy_rating,
+            expected_emotion={
+                "joy": expected_joy,
+                "fun": expected_fun,
+                "anger": expected_anger,
+                "sad": expected_sad
+            },
+            comments=comments if comments else None
+        )
+        
+        feedback_collector = FeedbackCollector()
+        feedback_collector.add_feedback(feedback)
+        
+        emotion_learner = EmotionLearner(feedback_collector)
+        emotion_learner.update_patterns()
+        
+        st.success("フィードバックが送信されました。ありがとうございます！")
+        
+        if st.checkbox("学習パターンを表示"):
+            st.json(json.loads(json.dumps(
+                emotion_learner.learning_data.emotion_patterns,
+                default=lambda o: o.model_dump() if hasattr(o, "model_dump") else str(o)
+            )))
+
+
+def display_learning_stats():
+    """学習データの統計を表示する"""
+    feedback_collector = FeedbackCollector()
+    emotion_learner = EmotionLearner(feedback_collector)
+    
+    st.subheader("学習データの統計")
+    
+    feedback_count = len(feedback_collector.learning_data.feedback_history)
+    st.write(f"収集されたフィードバック: **{feedback_count}**")
+    
+    pattern_count = len(emotion_learner.learning_data.emotion_patterns)
+    st.write(f"学習されたパターン: **{pattern_count}**")
+    
+    if pattern_count > 0:
+        area_patterns = {}
+        for pattern in emotion_learner.learning_data.emotion_patterns:
+            area = pattern.touched_area
+            if area not in area_patterns:
+                area_patterns[area] = 0
+            area_patterns[area] += 1
+        
+        st.write("部位ごとのパターン数:")
+        for area, count in area_patterns.items():
+            st.write(f"- {area}: {count}")
+        
+        if emotion_learner.learning_data.emotion_patterns:
+            most_confident = max(
+                emotion_learner.learning_data.emotion_patterns,
+                key=lambda p: p.confidence
+            )
+            st.write(f"最も信頼度の高いパターン: **{most_confident.touched_area}** (信頼度: {most_confident.confidence:.2f})")
+
+
 def main():
     """Main function for the Streamlit UI."""
     st.title("感情エージェントパイプライン")
-    st.markdown("""
-    このアプリケーションは、ユーザー入力（刺激の強さと触れられた部位）から感情を抽出・分類し、
-    適切な感情応答を生成します。
-    """)
+    
+    st.sidebar.title("ナビゲーション")
+    page = st.sidebar.radio("ページを選択", ["感情分析", "学習データ"])
+    
+    if page == "感情分析":
+        st.markdown("""
+        このアプリケーションは、ユーザー入力（刺激の強さと触れられた部位）から感情を抽出・分類し、
+        適切な感情応答を生成します。フィードバックを提供することで、システムの学習を支援できます。
+        """)
 
-    st.header("入力")
+        st.header("入力")
+        
+        data_value = st.slider(
+            "刺激の強さ", 
+            min_value=0.0, 
+            max_value=1.0, 
+            value=0.5, 
+            step=0.1,
+            help="0.0: 何も感じない, 0.5: 最も気持ちいい, 1.0: 痛みを感じる"
+        )
+        
+        touched_area = clickable_body_part_selector()
+        
+        use_learning = st.checkbox("学習データを使用", value=True, help="チェックすると、過去のフィードバックに基づいた学習データを使用します")
+        
+        if st.button("感情を分析"):
+            with st.spinner("感情を分析中..."):
+                user_input = UserInput(data=str(data_value), touched_area=touched_area)
+                
+                emotion_learner = None
+                if use_learning:
+                    feedback_collector = FeedbackCollector()
+                    emotion_learner = EmotionLearner(feedback_collector)
+                
+                ctx, error = run_async(run_pipeline(user_input, emotion_learner))
+                
+                if error:
+                    st.error(f"エラーが発生しました: {error}")
+                else:
+                    results = format_pipeline_results(ctx)
+                    
+                    st.header("結果")
+                    
+                    if results.get("is_learned_response", False):
+                        st.info("この応答は学習データに基づいています")
+                    
+                    st.subheader("抽出された感情")
+                    emotion_data = results["extracted_emotion"]
+                    st.json(emotion_data)
+                    
+                    display_emotion_visualization(emotion_data)
+                    
+                    st.subheader("元のメッセージ")
+                    st.write(results["original_message"])
+                    
+                    st.subheader("感情カテゴリ")
+                    st.write(results["emotion_category"])
+                    
+                    st.subheader("最終メッセージ")
+                    st.write(results["final_message"])
+                    
+                    if emotion_data:
+                        emotion = Emotion(**emotion_data)
+                        collect_feedback(user_input, emotion, results)
     
-    data_value = st.slider(
-        "刺激の強さ", 
-        min_value=0.0, 
-        max_value=1.0, 
-        value=0.5, 
-        step=0.1,
-        help="0.0: 何も感じない, 0.5: 最も気持ちいい, 1.0: 痛みを感じる"
-    )
-    
-    touched_area = clickable_body_part_selector()
-    
-    if st.button("感情を分析"):
-        with st.spinner("感情を分析中..."):
-            user_input = UserInput(data=str(data_value), touched_area=touched_area)
-            
-            ctx, error = run_async(run_pipeline(user_input))
-            
-            if error:
-                st.error(f"エラーが発生しました: {error}")
-            else:
-                results = format_pipeline_results(ctx)
-                
-                st.header("結果")
-                
-                st.subheader("抽出された感情")
-                st.json(results["extracted_emotion"])
-                
-                st.subheader("元のメッセージ")
-                st.write(results["original_message"])
-                
-                st.subheader("感情カテゴリ")
-                st.write(results["emotion_category"])
-                
-                st.subheader("最終メッセージ")
-                st.write(results["final_message"])
+    elif page == "学習データ":
+        st.header("学習データ")
+        
+        st.markdown("""
+        このページでは、システムが収集したフィードバックと学習したパターンを確認できます。
+        ユーザーからのフィードバックに基づいて、システムは刺激と感情の関係を学習します。
+        """)
+        
+        display_learning_stats()
+        
+        st.subheader("最近のフィードバック")
+        feedback_collector = FeedbackCollector()
+        recent_feedback = feedback_collector.get_recent_feedback(5)
+        
+        if recent_feedback:
+            for i, feedback in enumerate(recent_feedback):
+                with st.expander(f"フィードバック {i+1} ({feedback.timestamp.strftime('%Y-%m-%d %H:%M')})"):
+                    st.write(f"部位: {feedback.user_input.touched_area}")
+                    st.write(f"刺激の強さ: {feedback.user_input.data}")
+                    st.write(f"正確さ評価: {feedback.accuracy_rating}/5")
+                    
+                    st.write("生成された感情:")
+                    st.json(feedback.generated_emotion.model_dump())
+                    
+                    if feedback.expected_emotion:
+                        st.write("期待された感情:")
+                        st.json(feedback.expected_emotion)
+                    
+                    if feedback.comments:
+                        st.write(f"コメント: {feedback.comments}")
+        else:
+            st.info("まだフィードバックがありません。感情分析ページでフィードバックを提供してください。")
+        
+        st.subheader("学習されたパターン")
+        emotion_learner = EmotionLearner(feedback_collector)
+        
+        if emotion_learner.learning_data.emotion_patterns:
+            for i, pattern in enumerate(emotion_learner.learning_data.emotion_patterns):
+                with st.expander(f"パターン {i+1} ({pattern.touched_area}, 強さ: {pattern.stimulus_intensity:.1f})"):
+                    st.write(f"部位: {pattern.touched_area}")
+                    st.write(f"刺激の強さ: {pattern.stimulus_intensity:.2f}")
+                    st.write(f"信頼度: {pattern.confidence:.2f}")
+                    st.write(f"サンプル数: {pattern.sample_count}")
+                    
+                    st.write("感情値:")
+                    st.json(pattern.emotion_values)
+        else:
+            st.info("まだ学習パターンがありません。感情分析ページでフィードバックを提供してください。")
 
 
 if __name__ == "__main__":
     load_dotenv()
+    
+    os.makedirs("data/feedback", exist_ok=True)
     
     main()

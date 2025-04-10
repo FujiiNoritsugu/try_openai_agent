@@ -20,13 +20,15 @@ from ..agents.emotion_agents import (
 
 
 async def run_pipeline(
-    user_input: UserInput
+    user_input: UserInput,
+    emotion_learner=None
 ) -> Tuple[PipelineContext, Optional[Exception]]:
     """
     Execute the emotion agent pipeline with the given user input.
     
     Args:
         user_input: The user input containing data and touched area.
+        emotion_learner: Optional emotion learner to use for prediction.
         
     Returns:
         A tuple containing the pipeline context with results and any exception that occurred.
@@ -35,15 +37,25 @@ async def run_pipeline(
     error = None
     
     try:
-        result1 = await Runner.run(
-            emotion_agent, 
-            json.dumps(user_input.model_dump()), 
-            context=ctx
-        )
+        learned_emotion = None
+        if emotion_learner:
+            learned_emotion = emotion_learner.predict_emotion(user_input)
         
-        final_output: OriginalOutput = result1.final_output
-        ctx.emotion = final_output.emotion
-        ctx.original_message = final_output.message
+        if learned_emotion:
+            ctx.emotion = learned_emotion
+            ctx.original_message = "学習データに基づいた感情応答です。"
+            ctx.is_learned_response = True
+        else:
+            result1 = await Runner.run(
+                emotion_agent, 
+                json.dumps(user_input.model_dump()), 
+                context=ctx
+            )
+            
+            final_output: OriginalOutput = result1.final_output
+            ctx.emotion = final_output.emotion
+            ctx.original_message = final_output.message
+            ctx.is_learned_response = False
         
         result2 = await Runner.run(
             classification_agent,
@@ -77,4 +89,5 @@ def format_pipeline_results(ctx: PipelineContext) -> Dict[str, Any]:
         "original_message": ctx.original_message,
         "emotion_category": ctx.emotion_category,
         "final_message": ctx.modified_message,
+        "is_learned_response": getattr(ctx, "is_learned_response", False)
     }
