@@ -62,6 +62,8 @@ async def run_pipeline(
             ctx.original_message = final_output.message
             ctx.is_learned_response = False
         
+        gender = getattr(user_input, "gender", "男性")
+        
         classification_agent_inst = classification_agent.instructions
         classification_agent_with_gender = classification_agent.model_copy()
         
