@@ -5,7 +5,7 @@ import json
 import traceback
 from typing import Dict, Any, Optional, Tuple
 
-from agents import Runner
+from agents import Runner, Agent
 from ..models.data_models import (
     UserInput, 
     PipelineContext, 
@@ -49,10 +49,13 @@ async def run_pipeline(
             gender = user_input.gender
             
             emotion_agent_inst = emotion_agent.instructions.format(gender=gender)
-            emotion_agent_with_gender = emotion_agent.model_copy(update={"instructions": emotion_agent_inst})
             
             result1 = await Runner.run(
-                emotion_agent_with_gender, 
+                Agent[PipelineContext](
+                    name=emotion_agent.name,
+                    instructions=emotion_agent_inst,
+                    output_type=emotion_agent.output_type
+                ), 
                 json.dumps(user_input.model_dump()), 
                 context=ctx
             )
@@ -64,15 +67,21 @@ async def run_pipeline(
         
         gender = getattr(user_input, "gender", "男性")
         
-        classification_agent_inst = classification_agent.instructions
-        classification_agent_with_gender = classification_agent.model_copy()
-        
         emotion_handoffs = []
         for agent in classification_agent.handoffs:
             agent_inst = agent.instructions.format(gender=gender)
-            emotion_handoffs.append(agent.model_copy(update={"instructions": agent_inst}))
+            emotion_handoffs.append(Agent[PipelineContext](
+                name=agent.name,
+                instructions=agent_inst,
+                output_type=agent.output_type
+            ))
         
-        classification_agent_with_gender.handoffs = emotion_handoffs
+        classification_agent_with_gender = Agent[PipelineContext](
+            name=classification_agent.name,
+            instructions=classification_agent.instructions,
+            handoffs=emotion_handoffs,
+            output_type=classification_agent.output_type
+        )
         
         result2 = await Runner.run(
             classification_agent_with_gender,
