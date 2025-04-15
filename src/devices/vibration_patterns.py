@@ -1,8 +1,8 @@
 """
-Vibration patterns for haptic feedback device.
+触覚フィードバックデバイスの振動パターン。
 
-This module defines the vibration patterns for different emotion categories
-and provides a generator to create appropriate patterns based on emotion data.
+このモジュールは、異なる感情カテゴリに対応する振動パターンを定義し、
+感情データに基づいて適切なパターンを生成するジェネレータを提供します。
 """
 from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass
@@ -13,27 +13,27 @@ from ..models.data_models import Emotion
 
 @dataclass
 class VibrationStep:
-    """A single step in a vibration pattern."""
-    intensity: float  # 0.0-1.0 vibration intensity
-    duration: int     # Duration in milliseconds
+    """振動パターンの単一ステップ。"""
+    intensity: float  # 0.0-1.0 振動強度
+    duration: int     # ミリ秒単位の持続時間
 
 
 @dataclass
 class VibrationPattern:
     """
-    Represents a vibration pattern with sequence of intensity and duration.
+    強度と持続時間のシーケンスを持つ振動パターンを表します。
     
-    Attributes:
-        steps: List of vibration steps (intensity and duration pairs)
-        interval: Time between vibrations in milliseconds
-        repetitions: Number of times to repeat the pattern
+    属性:
+        steps: 振動ステップのリスト（強度と持続時間のペア）
+        interval: 振動間の時間（ミリ秒）
+        repetitions: パターンを繰り返す回数
     """
     steps: List[VibrationStep]
-    interval: int  # Interval between vibrations in milliseconds
-    repetitions: int  # Number of times to repeat the pattern
+    interval: int  # 振動間の間隔（ミリ秒）
+    repetitions: int  # パターンを繰り返す回数
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the pattern to a dictionary for serialization."""
+        """パターンをシリアライズ用の辞書に変換します。"""
         return {
             "steps": [{"intensity": step.intensity, "duration": step.duration} 
                      for step in self.steps],
@@ -42,12 +42,12 @@ class VibrationPattern:
         }
     
     def to_json(self) -> str:
-        """Convert the pattern to a JSON string."""
+        """パターンをJSON文字列に変換します。"""
         return json.dumps(self.to_dict())
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'VibrationPattern':
-        """Create a VibrationPattern from a dictionary."""
+        """辞書からVibrationPatternを作成します。"""
         steps = [VibrationStep(step["intensity"], step["duration"]) 
                 for step in data["steps"]]
         return cls(
@@ -58,31 +58,31 @@ class VibrationPattern:
     
     @classmethod
     def from_json(cls, json_str: str) -> 'VibrationPattern':
-        """Create a VibrationPattern from a JSON string."""
+        """JSON文字列からVibrationPatternを作成します。"""
         data = json.loads(json_str)
         return cls.from_dict(data)
 
 
 class EmotionVibrationPatterns:
     """
-    Defines vibration patterns for different emotion categories.
+    異なる感情カテゴリに対応する振動パターンを定義します。
     
-    Each emotion category (joy, anger, sorrow, pleasure) has base patterns
-    that are adjusted based on the intensity of the emotion.
+    各感情カテゴリ（喜、怒、哀、楽）には、感情の強度に基づいて
+    調整されるベースパターンがあります。
     """
     
     @staticmethod
     def joy_pattern(intensity_level: int = 3) -> VibrationPattern:
         """
-        Generate a joy vibration pattern.
+        喜びの振動パターンを生成します。
         
-        Joy is represented by rhythmic, light vibrations that are upbeat and positive.
+        喜びは、明るくポジティブなリズミカルで軽い振動で表現されます。
         
-        Args:
-            intensity_level: Emotion intensity from 0-5
+        引数:
+            intensity_level: 感情の強度（0-5）
             
-        Returns:
-            A VibrationPattern for joy emotion
+        戻り値:
+            喜びの感情に対応するVibrationPattern
         """
         base_intensity = 0.6
         base_duration = 200  # ms
@@ -114,15 +114,15 @@ class EmotionVibrationPatterns:
     @staticmethod
     def anger_pattern(intensity_level: int = 3) -> VibrationPattern:
         """
-        Generate an anger vibration pattern.
+        怒りの振動パターンを生成します。
         
-        Anger is represented by strong, short, rapid vibrations that convey tension and intensity.
+        怒りは、緊張感と強度を伝える強く短い急速な振動で表現されます。
         
-        Args:
-            intensity_level: Emotion intensity from 0-5
+        引数:
+            intensity_level: 感情の強度（0-5）
             
-        Returns:
-            A VibrationPattern for anger emotion
+        戻り値:
+            怒りの感情に対応するVibrationPattern
         """
         base_intensity = 0.9
         base_duration = 100  # ms
@@ -155,15 +155,15 @@ class EmotionVibrationPatterns:
     @staticmethod
     def sorrow_pattern(intensity_level: int = 3) -> VibrationPattern:
         """
-        Generate a sorrow vibration pattern.
+        悲しみの振動パターンを生成します。
         
-        Sorrow is represented by weak, slow, prolonged vibrations that convey quietness and introspection.
+        悲しみは、静けさと内省を伝える弱くゆっくりとした長い振動で表現されます。
         
-        Args:
-            intensity_level: Emotion intensity from 0-5
+        引数:
+            intensity_level: 感情の強度（0-5）
             
-        Returns:
-            A VibrationPattern for sorrow emotion
+        戻り値:
+            悲しみの感情に対応するVibrationPattern
         """
         base_intensity = 0.4
         base_duration = 500  # ms
@@ -195,15 +195,15 @@ class EmotionVibrationPatterns:
     @staticmethod
     def pleasure_pattern(intensity_level: int = 3) -> VibrationPattern:
         """
-        Generate a pleasure vibration pattern.
+        楽しさの振動パターンを生成します。
         
-        Pleasure is represented by medium-strength, melodic vibration patterns that convey relaxation and enjoyment.
+        楽しさは、リラックスと楽しさを伝える中程度の強さのメロディックな振動パターンで表現されます。
         
-        Args:
-            intensity_level: Emotion intensity from 0-5
+        引数:
+            intensity_level: 感情の強度（0-5）
             
-        Returns:
-            A VibrationPattern for pleasure emotion
+        戻り値:
+            楽しさの感情に対応するVibrationPattern
         """
         base_intensity = 0.5
         base_repetitions = 3
@@ -233,24 +233,23 @@ class EmotionVibrationPatterns:
 
 class VibrationPatternGenerator:
     """
-    Generates appropriate vibration patterns based on emotion data.
+    感情データに基づいて適切な振動パターンを生成します。
     
-    This class analyzes emotion data and creates vibration patterns
-    that best represent the emotional state, including handling
-    mixed emotions.
+    このクラスは感情データを分析し、感情状態を最もよく表現する振動パターンを
+    作成します。複数の感情が混在する場合の処理も含みます。
     """
     
     @staticmethod
     def get_dominant_emotions(emotion: Emotion, threshold: int = 2) -> List[Tuple[str, int]]:
         """
-        Identify dominant emotions from the emotion data.
+        感情データから主要な感情を特定します。
         
-        Args:
-            emotion: Emotion object with joy, fun, anger, and sad values
-            threshold: Minimum value to consider an emotion as significant
+        引数:
+            emotion: joy、fun、anger、sadの値を持つEmotionオブジェクト
+            threshold: 感情を有意とみなす最小値
             
-        Returns:
-            List of (emotion_name, intensity) tuples, sorted by intensity
+        戻り値:
+            (感情名, 強度)のタプルのリスト、強度順にソート
         """
         emotion_values = [
             ("joy", emotion.joy),
@@ -265,13 +264,13 @@ class VibrationPatternGenerator:
     @staticmethod
     def map_emotion_to_category(emotion_name: str) -> str:
         """
-        Map emotion parameter names to emotion categories.
+        感情パラメータ名を感情カテゴリにマッピングします。
         
-        Args:
-            emotion_name: Name of the emotion parameter
+        引数:
+            emotion_name: 感情パラメータの名前
             
-        Returns:
-            Emotion category name
+        戻り値:
+            感情カテゴリ名
         """
         mapping = {
             "joy": "joy",      # 喜
@@ -284,14 +283,14 @@ class VibrationPatternGenerator:
     @staticmethod
     def generate_pattern(emotion: Emotion, emotion_category: Optional[str] = None) -> VibrationPattern:
         """
-        Generate a vibration pattern based on emotion data and category.
+        感情データとカテゴリに基づいて振動パターンを生成します。
         
-        Args:
-            emotion: Emotion object with joy, fun, anger, and sad values
-            emotion_category: Optional category override (joy, anger, sorrow, pleasure)
+        引数:
+            emotion: joy、fun、anger、sadの値を持つEmotionオブジェクト
+            emotion_category: オプションのカテゴリ指定（joy、anger、sorrow、pleasure）
             
-        Returns:
-            A VibrationPattern representing the emotional state
+        戻り値:
+            感情状態を表現するVibrationPattern
         """
         if emotion_category:
             category = emotion_category.lower()
