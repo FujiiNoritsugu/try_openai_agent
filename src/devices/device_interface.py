@@ -1,8 +1,8 @@
 """
-Device interface for haptic feedback device.
+触覚フィードバックデバイスのインターフェース。
 
-This module provides an interface for communicating with the haptic feedback device
-and sending vibration patterns based on emotion analysis results.
+このモジュールは、触覚フィードバックデバイスと通信し、
+感情分析結果に基づいて振動パターンを送信するためのインターフェースを提供します。
 """
 from typing import Dict, Any, Optional
 import json
@@ -15,20 +15,20 @@ from .vibration_patterns import VibrationPattern, VibrationPatternGenerator
 
 class HapticDeviceInterface:
     """
-    Interface for communicating with haptic feedback devices.
+    触覚フィードバックデバイスと通信するためのインターフェース。
     
-    This class provides methods to send vibration patterns to connected
-    haptic devices based on emotion analysis results.
+    このクラスは、感情分析結果に基づいて接続された触覚デバイスに
+    振動パターンを送信するためのメソッドを提供します。
     """
     
     def __init__(self, device_id: str = "default", host: str = "localhost", port: int = 8765):
         """
-        Initialize the haptic device interface.
+        触覚デバイスインターフェースを初期化します。
         
-        Args:
-            device_id: Identifier for the device
-            host: Host address for the device communication
-            port: Port for the device communication
+        引数:
+            device_id: デバイスの識別子
+            host: デバイス通信のホストアドレス
+            port: デバイス通信のポート
         """
         self.device_id = device_id
         self.host = host
@@ -38,13 +38,13 @@ class HapticDeviceInterface:
     
     async def connect(self) -> bool:
         """
-        Establish connection with the haptic device.
+        触覚デバイスとの接続を確立します。
         
-        In a real implementation, this would establish a connection
-        with the physical device. For now, it's a placeholder.
+        実際の実装では、物理デバイスとの接続を確立します。
+        現時点ではプレースホルダーです。
         
-        Returns:
-            True if connection successful, False otherwise
+        戻り値:
+            接続が成功した場合はTrue、それ以外の場合はFalse
         """
         self.logger.info(f"Connecting to haptic device {self.device_id} at {self.host}:{self.port}")
         
@@ -56,10 +56,10 @@ class HapticDeviceInterface:
     
     async def disconnect(self) -> bool:
         """
-        Disconnect from the haptic device.
+        触覚デバイスとの接続を切断します。
         
-        Returns:
-            True if disconnection successful, False otherwise
+        戻り値:
+            切断が成功した場合はTrue、それ以外の場合はFalse
         """
         if not self.connected:
             return True
@@ -74,13 +74,13 @@ class HapticDeviceInterface:
     
     async def send_pattern(self, pattern: VibrationPattern) -> bool:
         """
-        Send a vibration pattern to the device.
+        振動パターンをデバイスに送信します。
         
-        Args:
-            pattern: The vibration pattern to send
+        引数:
+            pattern: 送信する振動パターン
             
-        Returns:
-            True if pattern was sent successfully, False otherwise
+        戻り値:
+            パターンが正常に送信された場合はTrue、それ以外の場合はFalse
         """
         if not self.connected:
             self.logger.warning("Cannot send pattern: device not connected")
@@ -97,14 +97,14 @@ class HapticDeviceInterface:
     
     async def send_emotion(self, emotion: Emotion, emotion_category: Optional[str] = None) -> bool:
         """
-        Generate and send a vibration pattern based on emotion data.
+        感情データに基づいて振動パターンを生成し送信します。
         
-        Args:
-            emotion: Emotion object with joy, fun, anger, and sad values
-            emotion_category: Optional emotion category override
+        引数:
+            emotion: joy、fun、anger、sadの値を持つEmotionオブジェクト
+            emotion_category: オプションの感情カテゴリ指定
             
-        Returns:
-            True if pattern was generated and sent successfully, False otherwise
+        戻り値:
+            パターンが生成され正常に送信された場合はTrue、それ以外の場合はFalse
         """
         pattern = VibrationPatternGenerator.generate_pattern(emotion, emotion_category)
         
@@ -112,16 +112,16 @@ class HapticDeviceInterface:
     
     async def process_pipeline_context(self, ctx: PipelineContext) -> bool:
         """
-        Process pipeline context and send appropriate vibration pattern.
+        パイプラインコンテキストを処理し、適切な振動パターンを送信します。
         
-        This method extracts emotion data and category from the pipeline context
-        and sends the appropriate vibration pattern to the device.
+        このメソッドは、パイプラインコンテキストから感情データとカテゴリを抽出し、
+        適切な振動パターンをデバイスに送信します。
         
-        Args:
-            ctx: Pipeline context with emotion data and category
+        引数:
+            ctx: 感情データとカテゴリを含むパイプラインコンテキスト
             
-        Returns:
-            True if pattern was sent successfully, False otherwise
+        戻り値:
+            パターンが正常に送信された場合はTrue、それ以外の場合はFalse
         """
         if not ctx.emotion:
             self.logger.warning("Cannot process context: no emotion data")
@@ -132,28 +132,28 @@ class HapticDeviceInterface:
 
 class HapticFeedbackManager:
     """
-    Manager for haptic feedback devices.
+    触覚フィードバックデバイスのマネージャー。
     
-    This class provides a high-level interface for managing haptic devices
-    and sending emotion-based feedback.
+    このクラスは、触覚デバイスを管理し、感情ベースのフィードバックを
+    送信するための高レベルインターフェースを提供します。
     """
     
     def __init__(self):
-        """Initialize the haptic feedback manager."""
+        """触覚フィードバックマネージャーを初期化します。"""
         self.devices = {}
         self.logger = logging.getLogger(__name__)
     
     def register_device(self, device_id: str, host: str = "localhost", port: int = 8765) -> HapticDeviceInterface:
         """
-        Register a new haptic device.
+        新しい触覚デバイスを登録します。
         
-        Args:
-            device_id: Identifier for the device
-            host: Host address for the device
-            port: Port for the device
+        引数:
+            device_id: デバイスの識別子
+            host: デバイスのホストアドレス
+            port: デバイスのポート
             
-        Returns:
-            The registered device interface
+        戻り値:
+            登録されたデバイスインターフェース
         """
         device = HapticDeviceInterface(device_id, host, port)
         self.devices[device_id] = device
@@ -162,22 +162,22 @@ class HapticFeedbackManager:
     
     def get_device(self, device_id: str) -> Optional[HapticDeviceInterface]:
         """
-        Get a registered device by ID.
+        IDで登録済みのデバイスを取得します。
         
-        Args:
-            device_id: Identifier for the device
+        引数:
+            device_id: デバイスの識別子
             
-        Returns:
-            The device interface if found, None otherwise
+        戻り値:
+            見つかった場合はデバイスインターフェース、それ以外の場合はNone
         """
         return self.devices.get(device_id)
     
     async def connect_all(self) -> Dict[str, bool]:
         """
-        Connect to all registered devices.
+        登録されたすべてのデバイスに接続します。
         
-        Returns:
-            Dictionary mapping device IDs to connection success status
+        戻り値:
+            デバイスIDと接続成功状態をマッピングした辞書
         """
         results = {}
         for device_id, device in self.devices.items():
@@ -186,10 +186,10 @@ class HapticFeedbackManager:
     
     async def disconnect_all(self) -> Dict[str, bool]:
         """
-        Disconnect from all registered devices.
+        登録されたすべてのデバイスから切断します。
         
-        Returns:
-            Dictionary mapping device IDs to disconnection success status
+        戻り値:
+            デバイスIDと切断成功状態をマッピングした辞書
         """
         results = {}
         for device_id, device in self.devices.items():
@@ -198,14 +198,14 @@ class HapticFeedbackManager:
     
     async def send_to_all(self, emotion: Emotion, emotion_category: Optional[str] = None) -> Dict[str, bool]:
         """
-        Send emotion data to all connected devices.
+        感情データをすべての接続されたデバイスに送信します。
         
-        Args:
-            emotion: Emotion object with joy, fun, anger, and sad values
-            emotion_category: Optional emotion category override
+        引数:
+            emotion: joy、fun、anger、sadの値を持つEmotionオブジェクト
+            emotion_category: オプションの感情カテゴリ指定
             
-        Returns:
-            Dictionary mapping device IDs to send success status
+        戻り値:
+            デバイスIDと送信成功状態をマッピングした辞書
         """
         results = {}
         for device_id, device in self.devices.items():
@@ -214,13 +214,13 @@ class HapticFeedbackManager:
     
     async def process_pipeline_context(self, ctx: PipelineContext) -> Dict[str, bool]:
         """
-        Process pipeline context and send to all connected devices.
+        パイプラインコンテキストを処理し、すべての接続されたデバイスに送信します。
         
-        Args:
-            ctx: Pipeline context with emotion data and category
+        引数:
+            ctx: 感情データとカテゴリを含むパイプラインコンテキスト
             
-        Returns:
-            Dictionary mapping device IDs to send success status
+        戻り値:
+            デバイスIDと送信成功状態をマッピングした辞書
         """
         results = {}
         for device_id, device in self.devices.items():
