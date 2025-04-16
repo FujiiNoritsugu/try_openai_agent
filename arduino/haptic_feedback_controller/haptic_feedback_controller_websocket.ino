@@ -15,8 +15,10 @@
 #include <WebSocketServer.h>
 
 // WiFi設定
-const char* ssid = "your_wifi_ssid";      // WiFi SSID
-const char* password = "your_wifi_password";  // WiFi パスワード
+// 注意: 実際の認証情報は環境設定ファイルから読み込むか、初期設定時に設定する必要があります
+// 以下はプレースホルダーであり、実際のデプロイ時には適切な方法で設定してください
+char ssid[32];      // WiFi SSID
+char password[64];  // WiFi パスワード
 
 // サーバー設定
 WiFiServer httpServer(80);
@@ -105,17 +107,55 @@ void loop() {
 
 /**
  * WiFiに接続する
+ * 
+ * 注意: 実際の環境では、WiFi認証情報を安全に設定する方法を実装する必要があります。
+ * 例えば、シリアル経由での設定、EEPROM/フラッシュメモリへの保存、
+ * またはWiFiマネージャーライブラリを使用したキャプティブポータルなど。
  */
 void connectToWiFi() {
+  // WiFi設定の初期化
+  // 実際の実装では、以下のコードをEEPROMからの読み込みや
+  // シリアル経由での設定などに置き換えてください
+  
+  // 開発時のみ: シリアルからの設定を待機
+  Serial.println("WiFi設定を入力してください");
+  Serial.println("SSID: ");
+  while (!Serial.available()) {
+    delay(100);
+  }
+  
+  String inputSsid = Serial.readStringUntil('\n');
+  inputSsid.trim();
+  inputSsid.toCharArray(ssid, sizeof(ssid));
+  
+  Serial.println("パスワード: ");
+  while (!Serial.available()) {
+    delay(100);
+  }
+  
+  String inputPassword = Serial.readStringUntil('\n');
+  inputPassword.trim();
+  inputPassword.toCharArray(password, sizeof(password));
+  
+  // WiFi接続の開始
   Serial.print("WiFiに接続中: ");
   Serial.println(ssid);
 
   WiFi.begin(ssid, password);
   
   // 接続が確立されるまで待機
+  unsigned long startTime = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    
+    // タイムアウト処理（30秒）
+    if (millis() - startTime > 30000) {
+      Serial.println("\nWiFi接続がタイムアウトしました");
+      currentState = ERROR;
+      errorMessage = "WiFi接続タイムアウト";
+      return;
+    }
   }
 
   Serial.println("");
