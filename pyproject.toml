@@ -9,6 +9,8 @@ dependencies = [
     "openai>=1.68.2",
     "openai-agents>=0.0.7",
     "streamlit>=1.44.1",
+    "aiohttp>=3.8.5",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]

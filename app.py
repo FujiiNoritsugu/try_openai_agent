@@ -16,6 +16,7 @@ from src.models.feedback_models import UserFeedback
 from src.pipeline.pipeline import run_pipeline, format_pipeline_results
 from src.learning.feedback_collector import FeedbackCollector
 from src.learning.emotion_learner import EmotionLearner
+from src.devices.pipeline_integration import haptic_feedback
 
 
 def run_async(coroutine):
@@ -246,12 +247,13 @@ def main():
     st.title("感情エージェントパイプライン")
     
     st.sidebar.title("ナビゲーション")
-    page = st.sidebar.radio("ページを選択", ["感情分析", "学習データ"])
+    page = st.sidebar.radio("ページを選択", ["感情分析", "学習データ", "デバイス設定"])
     
     if page == "感情分析":
         st.markdown("""
         このアプリケーションは、ユーザー入力（刺激の強さと触れられた部位）から感情を抽出・分類し、
         適切な感情応答を生成します。フィードバックを提供することで、システムの学習を支援できます。
+        触覚フィードバックデバイスが接続されている場合は、感情に応じた振動パターンが送信されます。
         """)
 
         st.header("入力")
@@ -277,6 +279,8 @@ def main():
         
         use_learning = st.checkbox("学習データを使用", value=True, help="チェックすると、過去のフィードバックに基づいた学習データを使用します")
         
+        use_haptic_feedback = st.checkbox("触覚フィードバックを使用", value=True, help="チェックすると、感情分析結果を触覚フィードバックデバイスに送信します")
+        
         if st.button("感情を分析"):
             with st.spinner("感情を分析中..."):
                 user_input = UserInput(data=str(data_value), touched_area=touched_area, gender=gender)
@@ -286,13 +290,39 @@ def main():
                     feedback_collector = FeedbackCollector()
                     emotion_learner = EmotionLearner(feedback_collector)
                 
-                ctx, error = run_async(run_pipeline(user_input, emotion_learner))
+                if use_haptic_feedback and "haptic_devices" in st.session_state and st.session_state.haptic_devices:
+                    try:
+                        if not hasattr(st.session_state, "haptic_initialized") or not st.session_state.haptic_initialized:
+                            st.session_state.haptic_initialized = run_async(haptic_feedback.initialize(st.session_state.haptic_devices))
+                            
+                        if st.session_state.haptic_initialized:
+                            results, device_results = run_async(haptic_feedback.run_pipeline_and_send(user_input, emotion_learner))
+                            
+                            if device_results:
+                                st.success("触覚フィードバックデバイスに振動パターンを送信しました")
+                                for device_id, success in device_results.items():
+                                    if success:
+                                        st.info(f"デバイス '{device_id}' に正常に送信されました")
+                                    else:
+                                        st.warning(f"デバイス '{device_id}' への送信に失敗しました")
+                            
+                            ctx = None
+                            error = None
+                        else:
+                            st.warning("触覚フィードバックシステムの初期化に失敗しました。通常のパイプラインを使用します。")
+                            ctx, error = run_async(run_pipeline(user_input, emotion_learner))
+                            results = format_pipeline_results(ctx) if not error else None
+                    except Exception as e:
+                        st.error(f"触覚フィードバック処理中にエラーが発生しました: {str(e)}")
+                        ctx, error = run_async(run_pipeline(user_input, emotion_learner))
+                        results = format_pipeline_results(ctx) if not error else None
+                else:
+                    ctx, error = run_async(run_pipeline(user_input, emotion_learner))
+                    results = format_pipeline_results(ctx) if not error else None
                 
                 if error:
                     st.error(f"エラーが発生しました: {error}")
-                else:
-                    results = format_pipeline_results(ctx)
-                    
+                elif results:
                     st.header("結果")
                     
                     if results.get("is_learned_response", False):
@@ -365,6 +395,130 @@ def main():
                     st.json(pattern.emotion_values)
         else:
             st.info("まだ学習パターンがありません。感情分析ページでフィードバックを提供してください。")
+            
+    elif page == "デバイス設定":
+        st.header("触覚フィードバックデバイス設定")
+        
+        st.markdown("""
+        このページでは、触覚フィードバックデバイスの設定を行います。
+        Arduino Uno R4 WiFiデバイスのIPアドレスとポートを設定し、
+        感情分析結果に基づいた振動パターンを送信できるようにします。
+        """)
+        
+        if "haptic_devices" not in st.session_state:
+            st.session_state.haptic_devices = []
+            
+        if "haptic_initialized" not in st.session_state:
+            st.session_state.haptic_initialized = False
+            
+        if st.session_state.haptic_devices:
+            st.subheader("登録済みデバイス")
+            
+            for i, device in enumerate(st.session_state.haptic_devices):
+                with st.expander(f"デバイス {i+1}: {device['device_id']} ({device['host']}:{device['port']})"):
+                    st.write(f"デバイスID: {device['device_id']}")
+                    st.write(f"ホスト: {device['host']}")
+                    st.write(f"ポート: {device['port']}")
+                    st.write(f"WebSocketパス: {device.get('ws_path', '/ws')}")
+                    
+                    if st.button(f"デバイス {i+1} を削除", key=f"delete_device_{i}"):
+                        st.session_state.haptic_devices.pop(i)
+                        st.session_state.haptic_initialized = False
+                        st.experimental_rerun()
+        else:
+            st.info("登録済みデバイスはありません。以下のフォームからデバイスを追加してください。")
+            
+        st.subheader("デバイスを追加")
+        
+        with st.form("add_device_form"):
+            device_id = st.text_input("デバイスID", value=f"device{len(st.session_state.haptic_devices) + 1}")
+            host = st.text_input("ホスト (IPアドレス)", value="192.168.1.100")
+            port = st.number_input("ポート", value=80, min_value=1, max_value=65535)
+            ws_path = st.text_input("WebSocketパス", value="/ws")
+            
+            submitted = st.form_submit_button("デバイスを追加")
+            
+            if submitted:
+                new_device = {
+                    "device_id": device_id,
+                    "host": host,
+                    "port": port,
+                    "ws_path": ws_path
+                }
+                
+                st.session_state.haptic_devices.append(new_device)
+                st.session_state.haptic_initialized = False
+                st.success(f"デバイス '{device_id}' が追加されました")
+                st.experimental_rerun()
+                
+        if st.session_state.haptic_devices:
+            st.subheader("デバイス接続テスト")
+            
+            if st.button("接続テスト"):
+                with st.spinner("デバイスに接続中..."):
+                    initialized = run_async(haptic_feedback.initialize(st.session_state.haptic_devices))
+                    
+                    if initialized:
+                        st.session_state.haptic_initialized = True
+                        st.success("すべてのデバイスに正常に接続しました")
+                        
+                        status = run_async(haptic_feedback.get_all_device_status())
+                        
+                        if status:
+                            st.subheader("デバイスの状態")
+                            for device_id, device_status in status.items():
+                                if device_status:
+                                    st.write(f"デバイス '{device_id}': {device_status.device_state}")
+                                else:
+                                    st.warning(f"デバイス '{device_id}' の状態を取得できませんでした")
+                    else:
+                        st.error("デバイス接続に失敗しました。ホストとポートの設定を確認してください。")
+                        
+            if st.session_state.haptic_initialized:
+                st.subheader("テスト振動パターン")
+                
+                emotion_category = st.selectbox(
+                    "感情カテゴリ",
+                    options=["joy", "anger", "sorrow", "pleasure"],
+                    format_func=lambda x: {
+                        "joy": "喜び",
+                        "anger": "怒り",
+                        "sorrow": "悲しみ",
+                        "pleasure": "快楽"
+                    }.get(x, x)
+                )
+                
+                intensity = st.slider("感情強度", min_value=0.0, max_value=1.0, value=0.7, step=0.1)
+                
+                if st.button("テストパターンを送信"):
+                    with st.spinner("振動パターンを送信中..."):
+                        emotion = Emotion(
+                            joy=intensity if emotion_category == "joy" else 0.1,
+                            fun=intensity if emotion_category == "pleasure" else 0.1,
+                            anger=intensity if emotion_category == "anger" else 0.1,
+                            sad=intensity if emotion_category == "sorrow" else 0.1
+                        )
+                        
+                        results = run_async(haptic_feedback.websocket_manager.send_to_all(emotion, emotion_category))
+                        
+                        if results:
+                            st.success("テストパターンを送信しました")
+                            for device_id, success in results.items():
+                                if success:
+                                    st.info(f"デバイス '{device_id}' に正常に送信されました")
+                                else:
+                                    st.warning(f"デバイス '{device_id}' への送信に失敗しました")
+                        else:
+                            st.error("テストパターンの送信に失敗しました")
+                            
+                if st.button("振動を停止"):
+                    with st.spinner("振動を停止中..."):
+                        results = run_async(haptic_feedback.stop_all_devices())
+                        
+                        if results:
+                            st.success("振動を停止しました")
+                        else:
+                            st.error("振動停止に失敗しました")
 
 
 if __name__ == "__main__":
