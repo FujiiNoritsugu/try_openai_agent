@@ -6,8 +6,11 @@ APIエンドポイントを提供するFastAPIアプリケーションを定義�
 """
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
 
 from .models import (
     DeviceConfig,
@@ -27,10 +30,24 @@ from ..pipeline.pipeline import run_pipeline, format_pipeline_results
 
 logger = logging.getLogger(__name__)
 
+registered_devices: List[DeviceConfig] = []
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """アプリケーションのライフスパンイベントハンドラ"""
+    logger.info("APIサーバーを起動中...")
+    yield
+    logger.info("APIサーバーをシャットダウン中...")
+    if haptic_feedback.is_initialized:
+        await haptic_feedback.shutdown()
+
+
 app = FastAPI(
     title="感情分析API",
     description="感情分析パイプラインと触覚フィードバックデバイスのAPIエンドポイント",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -41,21 +58,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-registered_devices: List[DeviceConfig] = []
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """HTTPException用のカスタム例外ハンドラ"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.detail, "details": getattr(exc, "details", None)}
+    )
 
 
-@app.on_event("startup")
-async def startup_event():
-    """アプリケーション起動時の処理"""
-    logger.info("APIサーバーを起動中...")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """アプリケーション終了時の処理"""
-    logger.info("APIサーバーをシャットダウン中...")
-    if haptic_feedback.is_initialized:
-        await haptic_feedback.shutdown()
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """バリデーションエラー用のカスタム例外ハンドラ"""
+    return JSONResponse(
+        status_code=422,
+        content={"error": "リクエストデータが無効です", "details": exc.errors()}
+    )
 
 
 @app.get("/", response_model=Dict[str, str])
@@ -74,7 +93,7 @@ async def analyze_emotion(request: EmotionAnalysisRequest):
     """
     try:
         if request.send_to_devices and not haptic_feedback.is_initialized and registered_devices:
-            await haptic_feedback.initialize([device.dict() for device in registered_devices])
+            await haptic_feedback.initialize([device.model_dump() for device in registered_devices])
         
         if request.send_to_devices and haptic_feedback.is_initialized:
             formatted_results, device_results = await haptic_feedback.run_pipeline_and_send(request.user_input)
@@ -136,16 +155,17 @@ async def unregister_device(device_id: str, background_tasks: BackgroundTasks):
     raise HTTPException(status_code=404, detail=f"デバイスID '{device_id}' が見つかりません")
 
 
-@app.post("/api/v1/devices/initialize", response_model=Dict[str, bool], responses={500: {"model": ErrorResponse}})
+@app.post("/api/v1/devices/initialize", response_model=Dict[str, bool], responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
 async def initialize_devices():
     """
     登録済みデバイスを初期化するエンドポイント
     """
-    if not registered_devices:
+    devices_to_check = getattr(app.state, "registered_devices", registered_devices)
+    if not devices_to_check:
         raise HTTPException(status_code=400, detail="初期化するデバイスがありません")
     
     try:
-        result = await haptic_feedback.initialize([device.dict() for device in registered_devices])
+        result = await haptic_feedback.initialize([device.model_dump() for device in registered_devices])
         return {"success": result}
     except Exception as e:
         logger.error(f"デバイス初期化中にエラーが発生しました: {str(e)}")
@@ -184,9 +204,9 @@ async def get_device_status():
             if status:
                 device_status_list.append(DeviceStatus(
                     device_id=device_id,
-                    device_state=status.device_state,
+                    device_state=status["device_state"],
                     connected=True,
-                    last_updated=getattr(status, "last_updated", None)
+                    last_updated=status.get("last_updated")
                 ))
             else:
                 device_status_list.append(DeviceStatus(
@@ -236,7 +256,7 @@ async def send_vibration(request: VibrationRequest):
 
 
 @app.post("/api/v1/vibration/stop", response_model=VibrationResponse, responses={500: {"model": ErrorResponse}})
-async def stop_vibration(device_ids: Optional[List[str]] = None):
+async def stop_vibration(request: Dict[str, Optional[List[str]]] = None):
     """
     振動を停止するエンドポイント
     
@@ -247,6 +267,7 @@ async def stop_vibration(device_ids: Optional[List[str]] = None):
         raise HTTPException(status_code=400, detail="デバイスが初期化されていません")
     
     try:
+        device_ids = request.get("device_ids") if request else None
         if device_ids:
             results = {}
             for device_id in device_ids:

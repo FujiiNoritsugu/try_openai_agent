@@ -7,10 +7,10 @@ from typing import Optional, Dict, Any, List
 
 class Emotion(BaseModel):
     """Emotion parameters model with joy, fun, anger, and sad values."""
-    joy: int
-    fun: int
-    anger: int
-    sad: int
+    joy: float
+    fun: float
+    anger: float
+    sad: float
 
 
 class UserInput(BaseModel):
