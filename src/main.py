@@ -1,5 +1,5 @@
 """
-Main entry point for the OpenAI agent pipeline.
+OpenAIエージェントパイプラインのメインエントリーポイント。
 """
 import asyncio
 import json
@@ -10,14 +10,14 @@ from .pipeline.pipeline import run_pipeline, format_pipeline_results
 
 
 async def interact():
-    """Execute the emotion agent pipeline with sample input and display results."""
+    """サンプル入力で感情エージェントパイプラインを実行し、結果を表示する。"""
     try:
         user_input = UserInput(data="0.8", touched_area="胸")
         
         ctx, error = await run_pipeline(user_input)
         
         if error:
-            print(f"Error occurred: {error}")
+            print(f"エラーが発生しました: {error}")
             return
         
         results = format_pipeline_results(ctx)
@@ -29,13 +29,13 @@ async def interact():
         print(f"コンテキストの内容: {ctx}")
         
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"エラーが発生しました: {e}")
         import traceback
         traceback.print_exc()
 
 
 def main():
-    """Load environment variables and run the interact function."""
+    """環境変数を読み込み、interact関数を実行する。"""
     load_dotenv()
     
     asyncio.run(interact())

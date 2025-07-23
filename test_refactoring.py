@@ -1,5 +1,5 @@
 """
-Test script to verify that the refactored code produces the same output as the original.
+リファクタリングされたコードが元のコードと同じ出力を生成することを確認するテストスクリプト。
 """
 import asyncio
 import json
@@ -11,21 +11,21 @@ from src.pipeline.pipeline import run_pipeline, format_pipeline_results
 
 
 async def test_refactored_implementation():
-    """Test the refactored implementation with sample input."""
+    """サンプル入力でリファクタリングされた実装をテストする。"""
     user_input = UserInput(data="0.8", touched_area="胸")
     
-    print("Testing refactored implementation...")
+    print("リファクタリングされた実装をテスト中...")
     ctx, error = await run_pipeline(user_input)
     
     if error:
-        print(f"Error occurred: {error}")
+        print(f"エラーが発生しました: {error}")
         return
     
     results = format_pipeline_results(ctx)
     
-    print("Refactored implementation output:")
+    print("リファクタリングされた実装の出力:")
     print(json.dumps(results, indent=2, ensure_ascii=False))
-    print("Test completed.")
+    print("テスト完了。")
 
 
 if __name__ == "__main__":

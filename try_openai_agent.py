@@ -1,6 +1,6 @@
 """
-OpenAI agent pipeline for emotion-based responses.
-This is a refactored version of the original implementation.
+感情ベースの応答のためのOpenAIエージェントパイプライン。
+これは元の実装のリファクタリングバージョンです。
 """
 from dotenv import load_dotenv
 import asyncio

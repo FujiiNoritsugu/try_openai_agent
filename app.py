@@ -1,5 +1,5 @@
 """
-Streamlit UI for the OpenAI agent pipeline.
+OpenAIエージェントパイプライン用のStreamlit UI。
 """
 import asyncio
 import os
@@ -13,7 +13,7 @@ from src.pipeline.pipeline import run_pipeline, format_pipeline_results
 
 
 def run_async(coroutine):
-    """Run an async function from a synchronous context."""
+    """同期的なコンテキストから非同期関数を実行する。"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     return loop.run_until_complete(coroutine)
@@ -119,7 +119,7 @@ def clickable_body_part_selector():
 
 
 def main():
-    """Main function for the Streamlit UI."""
+    """Streamlit UIのメイン関数。"""
     st.title("感情エージェントパイプライン")
     st.markdown("""
     このアプリケーションは、ユーザー入力（刺激の強さと触れられた部位）から感情を抽出・分類し、

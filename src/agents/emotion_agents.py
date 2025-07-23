@@ -1,5 +1,5 @@
 """
-Emotion agents for the OpenAI agent pipeline.
+OpenAIエージェントパイプライン用の感情エージェント。
 """
 from agents import Agent
 from agents.extensions.handoff_prompt import prompt_with_handoff_instructions

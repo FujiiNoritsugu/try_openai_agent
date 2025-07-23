@@ -1,5 +1,5 @@
 """
-Pipeline execution logic for the OpenAI agent pipeline.
+OpenAIエージェントパイプラインの実行ロジック。
 """
 import json
 import traceback
@@ -23,13 +23,13 @@ async def run_pipeline(
     user_input: UserInput
 ) -> Tuple[PipelineContext, Optional[Exception]]:
     """
-    Execute the emotion agent pipeline with the given user input.
+    指定されたユーザー入力で感情エージェントパイプラインを実行する。
     
     Args:
-        user_input: The user input containing data and touched area.
+        user_input: データと触れられた部位を含むユーザー入力。
         
     Returns:
-        A tuple containing the pipeline context with results and any exception that occurred.
+        結果を含むパイプラインコンテキストと発生した例外のタプル。
     """
     ctx = PipelineContext(user_input=user_input)
     error = None
@@ -64,13 +64,13 @@ async def run_pipeline(
 
 def format_pipeline_results(ctx: PipelineContext) -> Dict[str, Any]:
     """
-    Format the pipeline results for display.
+    パイプラインの結果を表示用にフォーマットする。
     
     Args:
-        ctx: The pipeline context with results.
+        ctx: 結果を含むパイプラインコンテキスト。
         
     Returns:
-        A dictionary with formatted results.
+        フォーマットされた結果の辞書。
     """
     return {
         "extracted_emotion": ctx.emotion.model_dump() if ctx.emotion else None,

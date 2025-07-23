@@ -1,3 +1,3 @@
 """
-OpenAI agent pipeline package.
+OpenAIエージェントパイプラインパッケージ。
 """

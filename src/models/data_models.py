@@ -1,12 +1,12 @@
 """
-Data models for the OpenAI agent pipeline.
+OpenAIエージェントパイプライン用のデータモデル。
 """
 from pydantic import BaseModel
 from typing import Optional
 
 
 class Emotion(BaseModel):
-    """Emotion parameters model with joy, fun, anger, and sad values."""
+    """喜び、楽しさ、怒り、悲しみの値を持つ感情パラメータモデル。"""
     joy: int
     fun: int
     anger: int
@@ -14,25 +14,25 @@ class Emotion(BaseModel):
 
 
 class UserInput(BaseModel):
-    """User input model with data and touched area."""
+    """データと触れられた部位を持つユーザー入力モデル。"""
     data: str
     touched_area: str
 
 
 class OriginalOutput(BaseModel):
-    """Output model for the emotion extraction agent."""
+    """感情抽出エージェント用の出力モデル。"""
     emotion: Emotion
     message: str
 
 
 class HandoffOutput(BaseModel):
-    """Output model for emotion category agents."""
+    """感情カテゴリエージェント用の出力モデル。"""
     emotion_category: str
     message: str
 
 
 class PipelineContext(BaseModel):
-    """Context model for sharing state between pipeline agents."""
+    """パイプラインエージェント間で状態を共有するためのコンテキストモデル。"""
     user_input: UserInput  # ユーザーからの刺激入力
     emotion: Optional[Emotion] = None  # エージェント1が導出した感情
     original_message: str = ""  # エージェント1が導出した元のメッセージ
