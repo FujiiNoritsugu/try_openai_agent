@@ -2,7 +2,7 @@
 OpenAIエージェントパイプライン用のデータモデル。
 """
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 
 class Emotion(BaseModel):
@@ -17,6 +17,7 @@ class UserInput(BaseModel):
     """データと触れられた部位を持つユーザー入力モデル。"""
     data: str
     touched_area: str
+    gender: str = "男性"  # デフォルト値は「男性」
 
 
 class OriginalOutput(BaseModel):
@@ -38,3 +39,5 @@ class PipelineContext(BaseModel):
     original_message: str = ""  # エージェント1が導出した元のメッセージ
     emotion_category: str = ""  # エージェント2が分類した喜怒哀楽カテゴリ
     modified_message: str = ""  # エージェント3が生成した最終メッセージ
+    is_learned_response: bool = False  # 学習データに基づいた応答かどうか
+    metadata: Dict[str, Any] = {}  # 追加のメタデータ
