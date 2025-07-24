@@ -7,24 +7,30 @@
  * ハードウェア:
  * - Arduino Uno R4 WiFi
  * - Youmile GR-YM-222-2振動モジュール
+ * 
+ * 設定:
+ * config.hファイルを作成して、以下の内容を記述してください：
+ * #define WIFI_SSID "your_wifi_ssid"
+ * #define WIFI_PASSWORD "your_wifi_password"
  */
 
 #include <WiFiS3.h>
 #include <ArduinoJson.h>
+#include "config.h"  // WiFi設定ファイル
 
 // WiFi設定
-const char* ssid = "your_wifi_ssid";      // WiFi SSID
-const char* password = "your_wifi_password";  // WiFi パスワード
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASSWORD;
 
 // サーバー設定
 WiFiServer server(80);
 WiFiClient client;
 
 // 振動モジュールのピン設定
-const int VIBRATION_PIN = 9;  // PWMピン
+const int VIBRATION_PIN = 9;  // PWMピン (Arduino UNO R4 WiFi: 3,5,6,9,10,11がPWM対応)
 
 // 振動パターンの最大ステップ数
-const int MAX_STEPS = 20;
+const int MAX_STEPS = 10;  // メモリ効率のため削減
 
 // 振動パターンの構造体
 struct VibrationStep {
@@ -39,18 +45,118 @@ struct VibrationPattern {
   int repeatCount;                 // 繰り返し回数
 };
 
-// 現在のパターン
-VibrationPattern currentPattern;
-bool isPlaying = false;
-unsigned long lastStepTime = 0;
-int currentStep = 0;
-int currentRepeat = 0;
+// 振動コントローラークラス
+class VibrationController {
+private:
+  VibrationPattern pattern;
+  bool playing;
+  unsigned long lastStepTime;
+  unsigned long intervalStartTime;
+  int currentStep;
+  int currentRepeat;
+  bool inInterval;
+  
+public:
+  VibrationController() : playing(false), lastStepTime(0), intervalStartTime(0), 
+                         currentStep(0), currentRepeat(0), inInterval(false) {}
+  
+  void setPattern(const VibrationPattern& newPattern) {
+    pattern = newPattern;
+  }
+  
+  void start() {
+    currentStep = 0;
+    currentRepeat = 0;
+    playing = true;
+    inInterval = false;
+    lastStepTime = millis();
+    Serial.println("振動パターンの再生を開始します");
+  }
+  
+  void stop() {
+    playing = false;
+    analogWrite(VIBRATION_PIN, 0);
+    Serial.println("振動パターンの再生を停止しました");
+  }
+  
+  bool isPlaying() { return playing; }
+  
+  void update() {
+    if (!playing) return;
+    
+    unsigned long currentTime = millis();
+    
+    // インターバル中の処理
+    if (inInterval) {
+      if (currentTime - intervalStartTime >= pattern.interval) {
+        inInterval = false;
+        lastStepTime = currentTime;
+      }
+      return;
+    }
+    
+    // 現在のステップの持続時間が経過したかチェック
+    if (currentTime - lastStepTime >= pattern.steps[currentStep].duration) {
+      // 次のステップに進む
+      currentStep++;
+      
+      // すべてのステップが完了したかチェック
+      if (currentStep >= pattern.stepCount) {
+        currentStep = 0;
+        currentRepeat++;
+        
+        // すべての繰り返しが完了したかチェック
+        if (currentRepeat >= pattern.repeatCount && pattern.repeatCount > 0) {
+          stop();
+          return;
+        }
+        
+        // ステップ間の間隔を開始
+        if (pattern.interval > 0) {
+          inInterval = true;
+          intervalStartTime = currentTime;
+          analogWrite(VIBRATION_PIN, 0);  // インターバル中は振動を停止
+          return;
+        }
+      }
+      
+      // 新しいステップの振動強度を設定
+      analogWrite(VIBRATION_PIN, pattern.steps[currentStep].intensity);
+      lastStepTime = currentTime;
+      
+      Serial.print("ステップ: ");
+      Serial.print(currentStep);
+      Serial.print(", 強度: ");
+      Serial.println(pattern.steps[currentStep].intensity);
+    }
+  }
+};
+
+// グローバルインスタンス
+VibrationController vibrationController;
+
+// WiFi接続状態
+enum WiFiState {
+  WIFI_DISCONNECTED,
+  WIFI_CONNECTING,
+  WIFI_CONNECTED
+};
+
+WiFiState wifiState = WIFI_DISCONNECTED;
+unsigned long lastWiFiCheckTime = 0;
+const unsigned long WIFI_CHECK_INTERVAL = 5000;  // 5秒ごとにチェック
 
 void setup() {
   // シリアル通信の初期化
   Serial.begin(115200);
   while (!Serial) {
     ; // シリアルポートが接続されるのを待つ
+  }
+
+  // PWMピンの検証
+  if (!isPWMPin(VIBRATION_PIN)) {
+    Serial.println("エラー: 指定されたピンはPWM非対応です");
+    while(1);  // 停止
   }
 
   // 振動モジュールのピンを出力として設定
@@ -65,14 +171,29 @@ void setup() {
   Serial.println("サーバーが開始されました");
 }
 
-void loop() {
-  // クライアント接続の確認
-  checkClientConnection();
-  
-  // 振動パターンの再生
-  if (isPlaying) {
-    playVibrationPattern();
+/**
+ * 指定されたピンがPWM対応かチェック
+ */
+bool isPWMPin(int pin) {
+  // Arduino UNO R4 WiFiのPWM対応ピン
+  int pwmPins[] = {3, 5, 6, 9, 10, 11};
+  for (int i = 0; i < 6; i++) {
+    if (pin == pwmPins[i]) return true;
   }
+  return false;
+}
+
+void loop() {
+  // WiFi接続状態の確認
+  checkWiFiConnection();
+  
+  // クライアント接続の確認
+  if (wifiState == WIFI_CONNECTED) {
+    checkClientConnection();
+  }
+  
+  // 振動パターンの更新
+  vibrationController.update();
 }
 
 /**
@@ -83,17 +204,55 @@ void connectToWiFi() {
   Serial.println(ssid);
 
   WiFi.begin(ssid, password);
+  wifiState = WIFI_CONNECTING;
   
-  // 接続が確立されるまで待機
-  while (WiFi.status() != WL_CONNECTED) {
+  // 接続試行（最大30秒）
+  unsigned long startTime = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 30000) {
     delay(500);
     Serial.print(".");
   }
 
-  Serial.println("");
-  Serial.println("WiFiに接続されました");
-  Serial.print("IPアドレス: ");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiState = WIFI_CONNECTED;
+    Serial.println("");
+    Serial.println("WiFiに接続されました");
+    
+    // IPアドレスが割り当てられるまで待機（最大5秒）
+    unsigned long ipWaitStart = millis();
+    while (WiFi.localIP() == IPAddress(0,0,0,0) && millis() - ipWaitStart < 5000) {
+      delay(100);
+    }
+    
+    Serial.print("IPアドレス: ");
+    Serial.println(WiFi.localIP());
+    
+    // IPアドレスが取得できなかった場合の警告
+    if (WiFi.localIP() == IPAddress(0,0,0,0)) {
+      Serial.println("警告: IPアドレスの取得に失敗しました");
+      Serial.println("DHCPサーバーの設定を確認してください");
+    }
+  } else {
+    wifiState = WIFI_DISCONNECTED;
+    Serial.println("");
+    Serial.println("WiFi接続に失敗しました");
+  }
+}
+
+/**
+ * WiFi接続状態をチェックし、必要に応じて再接続する
+ */
+void checkWiFiConnection() {
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastWiFiCheckTime >= WIFI_CHECK_INTERVAL) {
+    lastWiFiCheckTime = currentTime;
+    
+    if (WiFi.status() != WL_CONNECTED && wifiState != WIFI_CONNECTING) {
+      Serial.println("WiFi接続が切断されました。再接続を試みます...");
+      connectToWiFi();
+    }
+  }
 }
 
 /**
@@ -106,50 +265,82 @@ void checkClientConnection() {
   if (client) {
     Serial.println("新しいクライアントが接続されました");
     
-    // リクエストの読み取り
+    // HTTPリクエストの解析
+    String requestLine = "";
     String currentLine = "";
     String jsonData = "";
-    bool isJson = false;
+    int contentLength = 0;
+    bool isPost = false;
+    bool headerComplete = false;
+    unsigned long requestStartTime = millis();
     
     while (client.connected()) {
       if (client.available()) {
         char c = client.read();
         
-        // JSONデータの読み取り
-        if (c == '{') {
-          isJson = true;
-        }
-        
-        if (isJson) {
-          jsonData += c;
-        }
-        
-        if (c == '}' && isJson) {
-          isJson = false;
-          parseVibrationPattern(jsonData);
-          break;
-        }
-        
-        // HTTPリクエストの終了を検出
-        if (c == '\n') {
-          if (currentLine.length() == 0) {
-            // HTTPヘッダーの送信
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:application/json");
-            client.println("Connection: close");
-            client.println();
-            break;
-          } else {
+        if (!headerComplete) {
+          if (c == '\n') {
+            // 最初の行でHTTPメソッドを確認
+            if (requestLine.length() == 0) {
+              requestLine = currentLine;
+              if (requestLine.startsWith("POST")) {
+                isPost = true;
+              }
+            }
+            
+            // Content-Lengthヘッダーの確認
+            if (currentLine.startsWith("Content-Length: ")) {
+              contentLength = currentLine.substring(16).toInt();
+            }
+            
+            // ヘッダーの終了を検出
+            if (currentLine.length() == 0) {
+              headerComplete = true;
+              
+              // POSTリクエストの場合、ボディを読み取る
+              if (isPost && contentLength > 0) {
+                jsonData.reserve(contentLength);
+                int bytesRead = 0;
+                unsigned long bodyReadStart = millis();
+                while (bytesRead < contentLength && millis() - bodyReadStart < 2000) {
+                  if (client.available()) {
+                    jsonData += (char)client.read();
+                    bytesRead++;
+                  }
+                }
+              }
+              break;  // ヘッダー処理完了後はループを抜ける
+            }
             currentLine = "";
+          } else if (c != '\r') {
+            currentLine += c;
           }
-        } else if (c != '\r') {
-          currentLine += c;
         }
+      }
+      
+      // タイムアウトチェック（5秒）
+      if (millis() - requestStartTime > 5000) {
+        break;
       }
     }
     
     // レスポンスの送信
-    client.println("{\"status\":\"ok\"}");
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-type: application/json");
+    client.println("Connection: close");
+    client.println("Access-Control-Allow-Origin: *");
+    client.println();
+    
+    // JSONデータの処理
+    if (jsonData.length() > 0) {
+      if (parseVibrationPattern(jsonData)) {
+        client.println("{\"status\":\"ok\",\"message\":\"Pattern received\"}");
+      } else {
+        client.println("{\"status\":\"error\",\"message\":\"Invalid pattern\"}");
+      }
+    } else {
+      client.println("{\"status\":\"ok\",\"message\":\"No data\"}");
+    }
     
     // 接続のクローズ
     client.stop();
@@ -160,9 +351,14 @@ void checkClientConnection() {
 /**
  * 受信したJSONデータから振動パターンを解析する
  */
-void parseVibrationPattern(String jsonData) {
-  // JSONバッファの作成
-  DynamicJsonDocument doc(1024);
+bool parseVibrationPattern(String jsonData) {
+  // 動的なJSONバッファサイズの計算
+  const size_t capacity = JSON_OBJECT_SIZE(4) + 
+                         JSON_ARRAY_SIZE(MAX_STEPS) + 
+                         MAX_STEPS * JSON_OBJECT_SIZE(2) + 
+                         jsonData.length();
+  
+  DynamicJsonDocument doc(capacity);
   
   // JSONデータの解析
   DeserializationError error = deserializeJson(doc, jsonData);
@@ -171,79 +367,31 @@ void parseVibrationPattern(String jsonData) {
   if (error) {
     Serial.print("JSONの解析に失敗しました: ");
     Serial.println(error.c_str());
-    return;
+    return false;
   }
   
-  // 振動パターンの解析
-  currentPattern.stepCount = min((int)doc["steps"].size(), MAX_STEPS);
-  currentPattern.interval = doc["interval"];
-  currentPattern.repeatCount = doc["repeat_count"];
+  // 必須フィールドの確認
+  if (!doc.containsKey("steps") || !doc["steps"].is<JsonArray>()) {
+    Serial.println("エラー: 'steps'フィールドが見つかりません");
+    return false;
+  }
+  
+  // 振動パターンの作成
+  VibrationPattern newPattern;
+  newPattern.stepCount = min((int)doc["steps"].size(), MAX_STEPS);
+  newPattern.interval = doc["interval"] | 0;  // デフォルト値0
+  newPattern.repeatCount = doc["repeat_count"] | 1;  // デフォルト値1
   
   // 各ステップの解析
-  for (int i = 0; i < currentPattern.stepCount; i++) {
-    currentPattern.steps[i].intensity = map(doc["steps"][i]["intensity"], 0, 100, 0, 255);
-    currentPattern.steps[i].duration = doc["steps"][i]["duration"];
+  for (int i = 0; i < newPattern.stepCount; i++) {
+    int intensity = doc["steps"][i]["intensity"] | 0;
+    newPattern.steps[i].intensity = map(constrain(intensity, 0, 100), 0, 100, 0, 255);
+    newPattern.steps[i].duration = doc["steps"][i]["duration"] | 100;  // デフォルト100ms
   }
   
-  // パターン再生の開始
-  startVibrationPattern();
-}
-
-/**
- * 振動パターンの再生を開始する
- */
-void startVibrationPattern() {
-  currentStep = 0;
-  currentRepeat = 0;
-  isPlaying = true;
-  lastStepTime = millis();
+  // パターンの設定と再生開始
+  vibrationController.setPattern(newPattern);
+  vibrationController.start();
   
-  Serial.println("振動パターンの再生を開始します");
-}
-
-/**
- * 振動パターンを再生する
- */
-void playVibrationPattern() {
-  unsigned long currentTime = millis();
-  
-  // 現在のステップの持続時間が経過したかチェック
-  if (currentTime - lastStepTime >= currentPattern.steps[currentStep].duration) {
-    // 次のステップに進む
-    currentStep++;
-    
-    // すべてのステップが完了したかチェック
-    if (currentStep >= currentPattern.stepCount) {
-      currentStep = 0;
-      currentRepeat++;
-      
-      // すべての繰り返しが完了したかチェック
-      if (currentRepeat >= currentPattern.repeatCount && currentPattern.repeatCount > 0) {
-        // パターン再生の停止
-        stopVibrationPattern();
-        return;
-      }
-      
-      // ステップ間の間隔を追加
-      delay(currentPattern.interval);
-    }
-    
-    // 新しいステップの振動強度を設定
-    analogWrite(VIBRATION_PIN, currentPattern.steps[currentStep].intensity);
-    lastStepTime = currentTime;
-    
-    Serial.print("ステップ: ");
-    Serial.print(currentStep);
-    Serial.print(", 強度: ");
-    Serial.println(currentPattern.steps[currentStep].intensity);
-  }
-}
-
-/**
- * 振動パターンの再生を停止する
- */
-void stopVibrationPattern() {
-  isPlaying = false;
-  analogWrite(VIBRATION_PIN, 0);  // 振動をオフにする
-  Serial.println("振動パターンの再生を停止しました");
+  return true;
 }

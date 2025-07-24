@@ -87,3 +87,31 @@ await arduino_manager.disconnect_all()
 ## ライセンス
 
 このプロジェクトは、プロジェクトのメインリポジトリのライセンスに従います。
+
+## 検証用Curlコマンド
+
+  curl -X POST http://192.168.43.166 \
+    -H "Content-Type: application/json" \
+    -d '{
+      "steps": [
+        {"intensity": 50, "duration": 200},
+        {"intensity": 100, "duration": 300},
+        {"intensity": 75, "duration": 150}
+      ],
+      "interval": 100,
+      "repeat_count": 3
+    }'
+
+  または、1行で実行する場合：
+
+  curl -X POST http://192.168.43.166 -H "Content-Type: application/json" -d
+  '{"steps":[{"intensity":50,"duration":200},{"intensity":100,"duration":300},{"intensity":75,"duration":150}],"interval":100,"repeat_count":3}'
+
+  テスト用の異なるパターン例：
+
+  # 短い振動パターン
+  curl -X POST http://192.168.43.166 -H "Content-Type: application/json" -d '{"steps":[{"intensity":100,"duration":100}],"interval":0,"repeat_count":5}'
+
+  # 徐々に強くなるパターン
+  curl -X POST http://192.168.43.166 -H "Content-Type: application/json" -d '{"steps":[{"intensity":25,"duration":200},{"intensity":50,"duration":200},{"i
+  ntensity":75,"duration":200},{"intensity":100,"duration":200}],"interval":50,"repeat_count":2}'
