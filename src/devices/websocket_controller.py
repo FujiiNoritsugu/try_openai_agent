@@ -7,25 +7,33 @@ WebSocketコントローラーモジュール
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, Any, Optional, List, Callable
 import aiohttp
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..models.data_models import Emotion, PipelineContext
 from .vibration_patterns import VibrationPattern, VibrationPatternGenerator
+from .base_controller import BaseController, BaseControllerConfig, BaseControllerManager
 
 
-class WebSocketControllerConfig(BaseModel):
+class WebSocketControllerConfig(BaseControllerConfig):
     """
     WebSocketコントローラーの設定クラス
     """
-    host: str = "192.168.1.100"  # Arduinoのデフォルトホスト
-    port: int = 80               # Arduinoのデフォルトポート
-    ws_path: str = "/ws"         # WebSocketのパス
-    timeout: float = 5.0         # 通信タイムアウト（秒）
-    retry_count: int = 3         # 再試行回数
-    retry_delay: float = 1.0     # 再試行間の遅延（秒）
-    heartbeat_interval: float = 10.0  # ハートビート間隔（秒）
+    ws_path: str = Field("/ws", description="WebSocketのパス")
+    heartbeat_interval: float = Field(10.0, gt=0, description="ハートビート間隔（秒）")
+    
+    def __init__(self, **data):
+        # 環境変数からデフォルト値を設定
+        data.setdefault("host", os.getenv("WEBSOCKET_HOST", "192.168.1.100"))
+        data.setdefault("port", int(os.getenv("WEBSOCKET_PORT", "80")))
+        data.setdefault("ws_path", os.getenv("WEBSOCKET_PATH", "/ws"))
+        data.setdefault("timeout", float(os.getenv("WEBSOCKET_TIMEOUT", "5.0")))
+        data.setdefault("retry_count", int(os.getenv("WEBSOCKET_RETRY_COUNT", "3")))
+        data.setdefault("retry_delay", float(os.getenv("WEBSOCKET_RETRY_DELAY", "1.0")))
+        data.setdefault("heartbeat_interval", float(os.getenv("WEBSOCKET_HEARTBEAT", "10.0")))
+        super().__init__(**data)
 
 
 class DeviceStatus(BaseModel):
@@ -41,7 +49,7 @@ class DeviceStatus(BaseModel):
     error_message: Optional[str] = None
 
 
-class WebSocketController:
+class WebSocketController(BaseController):
     """
     WebSocketを使用したArduino Uno R4 WiFiコントローラークラス
     
@@ -56,15 +64,12 @@ class WebSocketController:
         引数:
             config: コントローラーの設定。指定しない場合はデフォルト設定が使用されます。
         """
-        self.config = config or WebSocketControllerConfig()
-        self.logger = logging.getLogger(__name__)
-        self.connected = False
-        self.session = None
-        self.ws = None
-        self.status_listeners = []
-        self.last_status = None
-        self._heartbeat_task = None
-        self._status_monitor_task = None
+        super().__init__(config or WebSocketControllerConfig())
+        self.ws: Optional[aiohttp.ClientWebSocketResponse] = None
+        self.status_listeners: List[Callable[[DeviceStatus], None]] = []
+        self.last_status: Optional[DeviceStatus] = None
+        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._status_monitor_task: Optional[asyncio.Task] = None
     
     async def connect(self) -> bool:
         """
@@ -79,16 +84,14 @@ class WebSocketController:
         self.logger.info(f"WebSocket経由でArduinoデバイスに接続中: ws://{self.config.host}:{self.config.port}{self.config.ws_path}")
         
         try:
-            self.session = aiohttp.ClientSession()
+            await self._ensure_session()
             
             async with self.session.get(
-                f"http://{self.config.host}:{self.config.port}/status",
-                timeout=self.config.timeout
+                f"http://{self.config.host}:{self.config.port}/status"
             ) as response:
                 if response.status != 200:
                     self.logger.error(f"デバイスの状態確認に失敗しました: {response.status}")
-                    await self.session.close()
-                    self.session = None
+                    await self._cleanup_session()
                     return False
                 
                 self.logger.info("デバイスがオンラインです。WebSocket接続を確立します。")
@@ -105,11 +108,17 @@ class WebSocketController:
             
             return True
                     
+        except aiohttp.ClientError as e:
+            self.logger.error(f"WebSocket接続中にネットワークエラーが発生しました: {str(e)}")
+            await self._cleanup_session()
+            return False
+        except asyncio.TimeoutError:
+            self.logger.error("WebSocket接続がタイムアウトしました")
+            await self._cleanup_session()
+            return False
         except Exception as e:
-            self.logger.error(f"WebSocket接続中にエラーが発生しました: {str(e)}")
-            if self.session:
-                await self.session.close()
-                self.session = None
+            self.logger.error(f"WebSocket接続中に予期しないエラーが発生しました: {str(e)}")
+            await self._cleanup_session()
             return False
     
     async def disconnect(self) -> bool:
@@ -124,15 +133,13 @@ class WebSocketController:
             
         self.logger.info("WebSocket接続を切断中")
         
-        self._stop_background_tasks()
+        await self._stop_background_tasks()
         
         if self.ws:
             await self.ws.close()
             self.ws = None
             
-        if self.session:
-            await self.session.close()
-            self.session = None
+        await self._cleanup_session()
             
         self.connected = False
         self.logger.info("WebSocket接続が切断されました")
@@ -148,11 +155,11 @@ class WebSocketController:
         戻り値:
             送信が成功した場合はTrue、それ以外の場合はFalse
         """
-        if not self.connected:
+        if not self.connected or not self.ws:
             self.logger.warning("パターンを送信できません: WebSocket接続がありません")
             return False
             
-        arduino_pattern = self._convert_pattern_to_arduino_format(pattern)
+        arduino_pattern = self._convert_pattern_to_specific_format(pattern)
         
         self.logger.info(f"パターンをWebSocket経由で送信中: {json.dumps(arduino_pattern)}")
         
@@ -160,7 +167,10 @@ class WebSocketController:
             try:
                 await self.ws.send_json(arduino_pattern)
                 
-                response = await self.ws.receive_json(timeout=self.config.timeout)
+                response = await asyncio.wait_for(
+                    self.ws.receive_json(), 
+                    timeout=self.config.timeout
+                )
                 
                 if response.get("status") == "ok":
                     self.logger.info("パターンが正常に送信されました")
@@ -168,8 +178,10 @@ class WebSocketController:
                 else:
                     self.logger.warning(f"パターン送信に失敗しました: {response.get('message', 'Unknown error')}")
                     
-            except Exception as e:
-                self.logger.error(f"パターン送信中にエラーが発生しました: {str(e)}")
+            except asyncio.TimeoutError:
+                self.logger.error("パターン送信がタイムアウトしました")
+            except aiohttp.ClientError as e:
+                self.logger.error(f"パターン送信中にネットワークエラーが発生しました: {str(e)}")
                 
                 if not self.connected or not self.ws or self.ws.closed:
                     self.logger.info("WebSocket接続が切断されました。再接続を試みます。")
@@ -179,43 +191,14 @@ class WebSocketController:
                     else:
                         self.logger.error("WebSocket再接続に失敗しました")
                         return False
+            except Exception as e:
+                self.logger.error(f"パターン送信中に予期しないエラーが発生しました: {str(e)}")
                 
             if attempt < self.config.retry_count - 1:
                 self.logger.info(f"再試行中... ({attempt + 1}/{self.config.retry_count})")
                 await asyncio.sleep(self.config.retry_delay)
                 
         return False
-    
-    async def send_emotion(self, emotion: Emotion, emotion_category: Optional[str] = None) -> bool:
-        """
-        感情データに基づいて振動パターンを生成し、WebSocket経由でArduinoデバイスに送信します。
-        
-        引数:
-            emotion: joy、fun、anger、sadの値を持つEmotionオブジェクト
-            emotion_category: オプションの感情カテゴリ指定
-            
-        戻り値:
-            パターンが生成され正常に送信された場合はTrue、それ以外の場合はFalse
-        """
-        pattern = VibrationPatternGenerator.generate_pattern(emotion, emotion_category)
-        
-        return await self.send_pattern(pattern)
-    
-    async def process_pipeline_context(self, ctx: PipelineContext) -> bool:
-        """
-        パイプラインコンテキストを処理し、適切な振動パターンをWebSocket経由でArduinoデバイスに送信します。
-        
-        引数:
-            ctx: 感情データとカテゴリを含むパイプラインコンテキスト
-            
-        戻り値:
-            パターンが正常に送信された場合はTrue、それ以外の場合はFalse
-        """
-        if not ctx.emotion:
-            self.logger.warning("コンテキストを処理できません: 感情データがありません")
-            return False
-            
-        return await self.send_emotion(ctx.emotion, ctx.emotion_category)
     
     async def stop_vibration(self) -> bool:
         """
@@ -305,31 +288,24 @@ class WebSocketController:
             self.status_listeners.remove(listener)
             self.logger.debug(f"状態リスナーが削除されました（残り: {len(self.status_listeners)}）")
     
-    def _convert_pattern_to_arduino_format(self, pattern: VibrationPattern) -> Dict[str, Any]:
+    def _convert_pattern_to_specific_format(self, pattern: VibrationPattern) -> Dict[str, Any]:
         """
-        振動パターンをArduino用のフォーマットに変換します。
+        WebSocket用にパターンを変換します。
         
         引数:
             pattern: 変換する振動パターン
             
         戻り値:
-            Arduino用のフォーマットに変換されたパターン
+            WebSocket用のフォーマットに変換されたパターン
         """
-        steps = []
+        # 基本的な変換を使用
+        base_format = self._convert_pattern_to_arduino_format(pattern)
         
-        for step in pattern.steps:
-            intensity = int(step.intensity * 100)
-            
-            steps.append({
-                "intensity": intensity,
-                "duration": step.duration
-            })
+        # WebSocket固有のフィールドを追加
+        base_format["type"] = "pattern"
+        base_format["timestamp"] = asyncio.get_event_loop().time()
         
-        return {
-            "steps": steps,
-            "interval": pattern.interval,
-            "repeat_count": pattern.repetitions
-        }
+        return base_format
     
     def _start_background_tasks(self) -> None:
         """バックグラウンドタスクを開始します。"""
@@ -339,15 +315,22 @@ class WebSocketController:
         if not self._status_monitor_task:
             self._status_monitor_task = asyncio.create_task(self._status_monitor_loop())
     
-    def _stop_background_tasks(self) -> None:
+    async def _stop_background_tasks(self) -> None:
         """バックグラウンドタスクを停止します。"""
+        tasks_to_cancel = []
+        
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
+            tasks_to_cancel.append(self._heartbeat_task)
             self._heartbeat_task = None
             
         if self._status_monitor_task:
             self._status_monitor_task.cancel()
+            tasks_to_cancel.append(self._status_monitor_task)
             self._status_monitor_task = None
+        
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
     
     async def _heartbeat_loop(self) -> None:
         """
@@ -367,8 +350,11 @@ class WebSocketController:
                         self.logger.error("WebSocket再接続に失敗しました")
                         break
                 else:
-                    await self.ws.send_str("status")
-                    await self.ws.receive_json(timeout=self.config.timeout)
+                    await self.ws.send_str("heartbeat")
+                    await asyncio.wait_for(
+                        self.ws.receive_json(),
+                        timeout=self.config.timeout
+                    )
                     
             except asyncio.CancelledError:
                 break
@@ -429,18 +415,13 @@ class WebSocketController:
                 await asyncio.sleep(1)  # エラー発生時は短い間隔で再試行
 
 
-class WebSocketControllerManager:
+class WebSocketControllerManager(BaseControllerManager):
     """
     WebSocketコントローラーのマネージャークラス
     
     このクラスは、複数のWebSocketコントローラーを管理し、
     感情ベースのフィードバックを送信するための高レベルインターフェースを提供します。
     """
-    
-    def __init__(self):
-        """WebSocketコントローラーマネージャーを初期化します。"""
-        self.controllers = {}
-        self.logger = logging.getLogger(__name__)
     
     def register_controller(self, device_id: str, host: str, port: int = 80, ws_path: str = "/ws") -> WebSocketController:
         """
@@ -460,73 +441,6 @@ class WebSocketControllerManager:
         self.controllers[device_id] = controller
         self.logger.info(f"WebSocketコントローラーを登録しました: {device_id}")
         return controller
-    
-    def get_controller(self, device_id: str) -> Optional[WebSocketController]:
-        """
-        IDで登録済みのコントローラーを取得します。
-        
-        引数:
-            device_id: デバイスの識別子
-            
-        戻り値:
-            見つかった場合はWebSocketコントローラー、それ以外の場合はNone
-        """
-        return self.controllers.get(device_id)
-    
-    async def connect_all(self) -> Dict[str, bool]:
-        """
-        登録されたすべてのWebSocketコントローラーに接続します。
-        
-        戻り値:
-            デバイスIDと接続成功状態をマッピングした辞書
-        """
-        results = {}
-        for device_id, controller in self.controllers.items():
-            results[device_id] = await controller.connect()
-        return results
-    
-    async def disconnect_all(self) -> Dict[str, bool]:
-        """
-        登録されたすべてのWebSocketコントローラーから切断します。
-        
-        戻り値:
-            デバイスIDと切断成功状態をマッピングした辞書
-        """
-        results = {}
-        for device_id, controller in self.controllers.items():
-            results[device_id] = await controller.disconnect()
-        return results
-    
-    async def send_to_all(self, emotion: Emotion, emotion_category: Optional[str] = None) -> Dict[str, bool]:
-        """
-        感情データをすべての接続されたWebSocketコントローラーに送信します。
-        
-        引数:
-            emotion: joy、fun、anger、sadの値を持つEmotionオブジェクト
-            emotion_category: オプションの感情カテゴリ指定
-            
-        戻り値:
-            デバイスIDと送信成功状態をマッピングした辞書
-        """
-        results = {}
-        for device_id, controller in self.controllers.items():
-            results[device_id] = await controller.send_emotion(emotion, emotion_category)
-        return results
-    
-    async def process_pipeline_context(self, ctx: PipelineContext) -> Dict[str, bool]:
-        """
-        パイプラインコンテキストを処理し、すべての接続されたWebSocketコントローラーに送信します。
-        
-        引数:
-            ctx: 感情データとカテゴリを含むパイプラインコンテキスト
-            
-        戻り値:
-            デバイスIDと送信成功状態をマッピングした辞書
-        """
-        results = {}
-        for device_id, controller in self.controllers.items():
-            results[device_id] = await controller.process_pipeline_context(ctx)
-        return results
     
     async def stop_all(self) -> Dict[str, bool]:
         """
@@ -551,6 +465,3 @@ class WebSocketControllerManager:
         for device_id, controller in self.controllers.items():
             results[device_id] = await controller.get_status()
         return results
-
-
-websocket_manager = WebSocketControllerManager()

@@ -3,8 +3,11 @@
 
 このモジュールは、触覚フィードバックデバイスと通信し、
 感情分析結果に基づいて振動パターンを送信するためのインターフェースを提供します。
+
+注意: このファイルはモックの実装であり、実際のデバイス通信は含まれていません。
+実際のデバイス実装については、arduino_controller.pyおよびwebsocket_controller.pyを参照してください。
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import json
 import asyncio
 import logging

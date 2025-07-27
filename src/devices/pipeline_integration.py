@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List, Tuple
 
 from ..models.data_models import PipelineContext, Emotion
 from ..pipeline.pipeline import run_pipeline, format_pipeline_results
-from .websocket_controller import websocket_manager, WebSocketController
+from .websocket_controller import WebSocketController, WebSocketControllerManager
 
 
 class HapticFeedbackIntegration:
@@ -23,11 +23,17 @@ class HapticFeedbackIntegration:
     触覚フィードバックデバイスに送信します。
     """
     
-    def __init__(self):
-        """HapticFeedbackIntegrationを初期化します。"""
+    def __init__(self, websocket_manager: Optional[WebSocketControllerManager] = None):
+        """
+        HapticFeedbackIntegrationを初期化します。
+        
+        引数:
+            websocket_manager: WebSocketコントローラーマネージャー。
+                              指定しない場合は新しいインスタンスが作成されます。
+        """
         self.logger = logging.getLogger(__name__)
-        self.websocket_manager = websocket_manager
-        self.connected_devices = set()
+        self.websocket_manager = websocket_manager or WebSocketControllerManager()
+        self.connected_devices: set[str] = set()
         self.is_initialized = False
     
     async def initialize(self, device_configs: List[Dict[str, Any]]) -> bool:
@@ -238,6 +244,3 @@ class HapticFeedbackIntegration:
         except Exception as e:
             self.logger.error(f"デバイス状態取得中にエラーが発生しました: {str(e)}")
             return {}
-
-
-haptic_feedback = HapticFeedbackIntegration()

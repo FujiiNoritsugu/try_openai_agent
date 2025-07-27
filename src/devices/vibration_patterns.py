@@ -5,7 +5,7 @@
 感情データに基づいて適切なパターンを生成するジェネレータを提供します。
 """
 from typing import List, Dict, Any, Optional, Tuple, Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 
 from ..models.data_models import Emotion
@@ -15,7 +15,21 @@ from ..models.data_models import Emotion
 class VibrationStep:
     """振動パターンの単一ステップ。"""
     intensity: float  # 0.0-1.0 振動強度
-    duration: int     # ミリ秒単位の持続時間
+    duration_ms: int  # ミリ秒単位の持続時間
+    
+    def __post_init__(self):
+        """値の検証を行います。"""
+        if not 0.0 <= self.intensity <= 1.0:
+            raise ValueError(f"強度は0.0から1.0の範囲内でなければなりません。受け取った値: {self.intensity}")
+        if self.duration_ms < 0:
+            raise ValueError(f"持続時間は0以上でなければなりません。受け取った値: {self.duration_ms}")
+        if self.duration_ms > 10000:  # 10秒以上は異常と判断
+            raise ValueError(f"持続時間が長すぎます（最大10秒）。受け取った値: {self.duration_ms}")
+    
+    @property
+    def duration(self) -> int:
+        """後方互換性のためのプロパティ"""
+        return self.duration_ms
 
 
 @dataclass
@@ -25,20 +39,43 @@ class VibrationPattern:
     
     属性:
         steps: 振動ステップのリスト（強度と持続時間のペア）
-        interval: 振動間の時間（ミリ秒）
-        repetitions: パターンを繰り返す回数
+        interval_ms: 振動間の時間（ミリ秒）
+        repeat_count: パターンを繰り返す回数
     """
     steps: List[VibrationStep]
-    interval: int  # 振動間の間隔（ミリ秒）
-    repetitions: int  # パターンを繰り返す回数
+    interval_ms: int  # 振動間の間隔（ミリ秒）
+    repeat_count: int  # パターンを繰り返す回数
+    
+    def __post_init__(self):
+        """値の検証を行います。"""
+        if not self.steps:
+            raise ValueError("振動パターンには少なくとも1つのステップが必要です")
+        if self.interval_ms < 0:
+            raise ValueError(f"間隔は0以上でなければなりません。受け取った値: {self.interval_ms}")
+        if self.interval_ms > 10000:  # 10秒以上は異常と判断
+            raise ValueError(f"間隔が長すぎます（最大10秒）。受け取った値: {self.interval_ms}")
+        if self.repeat_count < 1:
+            raise ValueError(f"繰り返し回数は1以上でなければなりません。受け取った値: {self.repeat_count}")
+        if self.repeat_count > 100:  # 100回以上は異常と判断
+            raise ValueError(f"繰り返し回数が多すぎます（最大100回）。受け取った値: {self.repeat_count}")
+    
+    @property
+    def interval(self) -> int:
+        """後方互換性のためのプロパティ"""
+        return self.interval_ms
+    
+    @property
+    def repetitions(self) -> int:
+        """後方互換性のためのプロパティ"""
+        return self.repeat_count
     
     def to_dict(self) -> Dict[str, Any]:
         """パターンをシリアライズ用の辞書に変換します。"""
         return {
-            "steps": [{"intensity": step.intensity, "duration": step.duration} 
+            "steps": [{"intensity": step.intensity, "duration": step.duration_ms} 
                      for step in self.steps],
-            "interval": self.interval,
-            "repetitions": self.repetitions
+            "interval": self.interval_ms,
+            "repetitions": self.repeat_count
         }
     
     def to_json(self) -> str:
@@ -48,12 +85,14 @@ class VibrationPattern:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'VibrationPattern':
         """辞書からVibrationPatternを作成します。"""
-        steps = [VibrationStep(step["intensity"], step["duration"]) 
-                for step in data["steps"]]
+        steps = [VibrationStep(
+            intensity=step["intensity"], 
+            duration_ms=step.get("duration_ms", step.get("duration", 0))
+        ) for step in data["steps"]]
         return cls(
             steps=steps,
-            interval=data["interval"],
-            repetitions=data["repetitions"]
+            interval_ms=data.get("interval_ms", data.get("interval", 0)),
+            repeat_count=data.get("repeat_count", data.get("repetitions", 1))
         )
     
     @classmethod
@@ -100,15 +139,15 @@ class EmotionVibrationPatterns:
             repetitions = base_repetitions
             
         steps = [
-            VibrationStep(intensity, base_duration),
-            VibrationStep(intensity + 0.1, base_duration),
-            VibrationStep(intensity, base_duration)
+            VibrationStep(intensity=intensity, duration_ms=base_duration),
+            VibrationStep(intensity=min(intensity + 0.1, 1.0), duration_ms=base_duration),
+            VibrationStep(intensity=intensity, duration_ms=base_duration)
         ]
         
         return VibrationPattern(
             steps=steps,
-            interval=base_interval,
-            repetitions=repetitions
+            interval_ms=base_interval,
+            repeat_count=repetitions
         )
     
     @staticmethod
@@ -140,16 +179,16 @@ class EmotionVibrationPatterns:
             interval = base_interval
             
         steps = [
-            VibrationStep(intensity, base_duration),
-            VibrationStep(intensity + 0.1 if intensity < 1.0 else 1.0, base_duration - 20),
-            VibrationStep(intensity, base_duration),
-            VibrationStep(intensity + 0.1 if intensity < 1.0 else 1.0, base_duration - 20)
+            VibrationStep(intensity=intensity, duration_ms=base_duration),
+            VibrationStep(intensity=min(intensity + 0.1, 1.0), duration_ms=max(base_duration - 20, 50)),
+            VibrationStep(intensity=intensity, duration_ms=base_duration),
+            VibrationStep(intensity=min(intensity + 0.1, 1.0), duration_ms=max(base_duration - 20, 50))
         ]
         
         return VibrationPattern(
             steps=steps,
-            interval=interval,
-            repetitions=base_repetitions
+            interval_ms=interval,
+            repeat_count=base_repetitions
         )
     
     @staticmethod
@@ -182,14 +221,14 @@ class EmotionVibrationPatterns:
             interval = base_interval
             
         steps = [
-            VibrationStep(base_intensity, duration),
-            VibrationStep(base_intensity - 0.1, duration + 100)
+            VibrationStep(intensity=base_intensity, duration_ms=duration),
+            VibrationStep(intensity=max(base_intensity - 0.1, 0.0), duration_ms=duration + 100)
         ]
         
         return VibrationPattern(
             steps=steps,
-            interval=base_interval,
-            repetitions=base_repetitions
+            interval_ms=base_interval,
+            repeat_count=base_repetitions
         )
     
     @staticmethod
@@ -217,17 +256,17 @@ class EmotionVibrationPatterns:
             max_intensity = 0.6
             
         steps = [
-            VibrationStep(base_intensity - 0.1, 250),
-            VibrationStep(base_intensity, 300),
-            VibrationStep(max_intensity, 350),
-            VibrationStep(base_intensity, 300),
-            VibrationStep(base_intensity - 0.1, 250)
+            VibrationStep(intensity=max(base_intensity - 0.1, 0.0), duration_ms=250),
+            VibrationStep(intensity=base_intensity, duration_ms=300),
+            VibrationStep(intensity=max_intensity, duration_ms=350),
+            VibrationStep(intensity=base_intensity, duration_ms=300),
+            VibrationStep(intensity=max(base_intensity - 0.1, 0.0), duration_ms=250)
         ]
         
         return VibrationPattern(
             steps=steps,
-            interval=base_interval,
-            repetitions=base_repetitions
+            interval_ms=base_interval,
+            repeat_count=base_repetitions
         )
 
 
@@ -331,9 +370,9 @@ class VibrationPatternGenerator:
         
         if not dominant_emotions:
             return VibrationPattern(
-                steps=[VibrationStep(0.3, 300)],
-                interval=200,
-                repetitions=1
+                steps=[VibrationStep(intensity=0.3, duration_ms=300)],
+                interval_ms=200,
+                repeat_count=1
             )
             
         primary_emotion, primary_intensity = dominant_emotions[0]
