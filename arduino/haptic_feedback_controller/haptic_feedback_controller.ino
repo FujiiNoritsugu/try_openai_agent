@@ -70,6 +70,14 @@ public:
     playing = true;
     inInterval = false;
     lastStepTime = millis();
+    
+    // 最初のステップの振動を開始
+    if (pattern.stepCount > 0) {
+      analogWrite(VIBRATION_PIN, pattern.steps[0].intensity);
+      Serial.print("開始ステップ: 0, 強度: ");
+      Serial.println(pattern.steps[0].intensity);
+    }
+    
     Serial.println("振動パターンの再生を開始します");
   }
   
@@ -121,13 +129,14 @@ public:
       }
       
       // 新しいステップの振動強度を設定
-      analogWrite(VIBRATION_PIN, pattern.steps[currentStep].intensity);
+      if (currentStep < pattern.stepCount) {
+        analogWrite(VIBRATION_PIN, pattern.steps[currentStep].intensity);
+        Serial.print("ステップ: ");
+        Serial.print(currentStep);
+        Serial.print(", 強度: ");
+        Serial.println(pattern.steps[currentStep].intensity);
+      }
       lastStepTime = currentTime;
-      
-      Serial.print("ステップ: ");
-      Serial.print(currentStep);
-      Serial.print(", 強度: ");
-      Serial.println(pattern.steps[currentStep].intensity);
     }
   }
 };
@@ -382,11 +391,27 @@ bool parseVibrationPattern(String jsonData) {
   newPattern.interval = doc["interval"] | 0;  // デフォルト値0
   newPattern.repeatCount = doc["repeat_count"] | 1;  // デフォルト値1
   
+  Serial.print("受信したパターン: ステップ数=");
+  Serial.print(newPattern.stepCount);
+  Serial.print(", 繰り返し=");
+  Serial.print(newPattern.repeatCount);
+  Serial.print(", 間隔=");
+  Serial.println(newPattern.interval);
+  
   // 各ステップの解析
   for (int i = 0; i < newPattern.stepCount; i++) {
     int intensity = doc["steps"][i]["intensity"] | 0;
     newPattern.steps[i].intensity = map(constrain(intensity, 0, 100), 0, 100, 0, 255);
     newPattern.steps[i].duration = doc["steps"][i]["duration"] | 100;  // デフォルト100ms
+    
+    Serial.print("ステップ ");
+    Serial.print(i);
+    Serial.print(": 強度=");
+    Serial.print(intensity);
+    Serial.print("% -> PWM値=");
+    Serial.print(newPattern.steps[i].intensity);
+    Serial.print(", 持続時間=");
+    Serial.println(newPattern.steps[i].duration);
   }
   
   // パターンの設定と再生開始

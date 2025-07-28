@@ -87,10 +87,10 @@ async def test_emotion_patterns(controller: ArduinoController) -> bool:
     logger.info("=== 感情パターンテスト ===")
     
     emotions_to_test = [
-        ("喜び", Emotion(joy=0.8, fun=0.3, anger=0.1, sad=0.1)),
-        ("怒り", Emotion(joy=0.1, fun=0.1, anger=0.9, sad=0.2)),
-        ("悲しみ", Emotion(joy=0.1, fun=0.0, anger=0.2, sad=0.8)),
-        ("楽しさ", Emotion(joy=0.6, fun=0.9, anger=0.0, sad=0.0)),
+        ("喜び", Emotion(joy=8, fun=3, anger=1, sad=1)),
+        ("怒り", Emotion(joy=1, fun=1, anger=9, sad=2)),
+        ("悲しみ", Emotion(joy=1, fun=0, anger=2, sad=8)),
+        ("楽しさ", Emotion(joy=6, fun=9, anger=0, sad=0)),
     ]
     
     for emotion_name, emotion in emotions_to_test:
@@ -199,22 +199,22 @@ async def interactive_test(controller: ArduinoController):
                 logger.info("強い振動を送信しました")
                 
             elif command == '4':
-                emotion = Emotion(joy=0.8, fun=0.3, anger=0.1, sad=0.1)
+                emotion = Emotion(joy=8, fun=3, anger=1, sad=1)
                 await controller.send_emotion(emotion)
                 logger.info("喜びパターンを送信しました")
                 
             elif command == '5':
-                emotion = Emotion(joy=0.1, fun=0.1, anger=0.9, sad=0.2)
+                emotion = Emotion(joy=1, fun=1, anger=9, sad=2)
                 await controller.send_emotion(emotion)
                 logger.info("怒りパターンを送信しました")
                 
             elif command == '6':
-                emotion = Emotion(joy=0.1, fun=0.0, anger=0.2, sad=0.8)
+                emotion = Emotion(joy=1, fun=0, anger=2, sad=8)
                 await controller.send_emotion(emotion)
                 logger.info("悲しみパターンを送信しました")
                 
             elif command == '7':
-                emotion = Emotion(joy=0.6, fun=0.9, anger=0.0, sad=0.0)
+                emotion = Emotion(joy=6, fun=9, anger=0, sad=0)
                 await controller.send_emotion(emotion)
                 logger.info("楽しさパターンを送信しました")
                 

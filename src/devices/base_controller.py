@@ -190,9 +190,9 @@ class BaseController(ABC):
         if not emotion:
             return False
             
-        # すべての感情値が0.0-1.0の範囲内であることを確認
+        # すべての感情値が0-10の範囲内であることを確認（整数値）
         values = [emotion.joy, emotion.fun, emotion.anger, emotion.sad]
-        return all(0.0 <= v <= 1.0 for v in values)
+        return all(0 <= v <= 10 for v in values)
     
     async def _retry_with_backoff(
         self, 

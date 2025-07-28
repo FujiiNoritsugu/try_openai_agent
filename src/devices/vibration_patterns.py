@@ -209,7 +209,13 @@ class EmotionVibrationPatterns:
         base_interval = 300  # ms
         base_repetitions = 2
         
+        # デフォルト値を設定
+        intensity = base_intensity
+        duration = base_duration
+        interval = base_interval
+        
         if intensity_level >= 4:  # High intensity
+            intensity = base_intensity + 0.1  # 0.5
             duration = 700  # ms
             interval = 200  # ms
         elif intensity_level <= 1:  # Low intensity
@@ -221,8 +227,8 @@ class EmotionVibrationPatterns:
             interval = base_interval
             
         steps = [
-            VibrationStep(intensity=base_intensity, duration_ms=duration),
-            VibrationStep(intensity=max(base_intensity - 0.1, 0.0), duration_ms=duration + 100)
+            VibrationStep(intensity=intensity, duration_ms=duration),
+            VibrationStep(intensity=max(intensity - 0.1, 0.0), duration_ms=duration + 100)
         ]
         
         return VibrationPattern(
