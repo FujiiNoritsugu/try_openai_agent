@@ -132,7 +132,7 @@ class EmotionVibrationPatterns:
             intensity = base_intensity + 0.2
             repetitions = 5
         elif intensity_level <= 1:  # Low intensity
-            intensity = base_intensity - 0.2
+            intensity = 0.5  # 最小値を0.5に設定
             repetitions = 2
         else:  # Medium intensity
             intensity = base_intensity
@@ -204,7 +204,7 @@ class EmotionVibrationPatterns:
         戻り値:
             悲しみの感情に対応するVibrationPattern
         """
-        base_intensity = 0.4
+        base_intensity = 0.5  # 最小値を0.5に設定
         base_duration = 500  # ms
         base_interval = 300  # ms
         base_repetitions = 2
@@ -215,11 +215,11 @@ class EmotionVibrationPatterns:
         interval = base_interval
         
         if intensity_level >= 4:  # High intensity
-            intensity = base_intensity + 0.1  # 0.5
+            intensity = 0.6  # 0.5から0.6に変更
             duration = 700  # ms
             interval = 200  # ms
         elif intensity_level <= 1:  # Low intensity
-            intensity = 0.2
+            intensity = 0.5  # 最小値を0.5に設定
             duration = 300  # ms
         else:  # Medium intensity
             intensity = base_intensity
@@ -228,7 +228,7 @@ class EmotionVibrationPatterns:
             
         steps = [
             VibrationStep(intensity=intensity, duration_ms=duration),
-            VibrationStep(intensity=max(intensity - 0.1, 0.0), duration_ms=duration + 100)
+            VibrationStep(intensity=max(intensity - 0.1, 0.5), duration_ms=duration + 100)
         ]
         
         return VibrationPattern(
@@ -250,7 +250,7 @@ class EmotionVibrationPatterns:
         戻り値:
             楽しさの感情に対応するVibrationPattern
         """
-        base_intensity = 0.5
+        base_intensity = 0.6  # 最小値を確保するため0.6に変更
         base_repetitions = 3
         base_interval = 150  # ms
         
@@ -262,11 +262,11 @@ class EmotionVibrationPatterns:
             max_intensity = 0.6
             
         steps = [
-            VibrationStep(intensity=max(base_intensity - 0.1, 0.0), duration_ms=250),
+            VibrationStep(intensity=0.5, duration_ms=250),
             VibrationStep(intensity=base_intensity, duration_ms=300),
             VibrationStep(intensity=max_intensity, duration_ms=350),
             VibrationStep(intensity=base_intensity, duration_ms=300),
-            VibrationStep(intensity=max(base_intensity - 0.1, 0.0), duration_ms=250)
+            VibrationStep(intensity=0.5, duration_ms=250)
         ]
         
         return VibrationPattern(
@@ -376,7 +376,7 @@ class VibrationPatternGenerator:
         
         if not dominant_emotions:
             return VibrationPattern(
-                steps=[VibrationStep(intensity=0.3, duration_ms=300)],
+                steps=[VibrationStep(intensity=0.5, duration_ms=300)],
                 interval_ms=200,
                 repeat_count=1
             )

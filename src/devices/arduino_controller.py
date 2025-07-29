@@ -140,7 +140,7 @@ class ArduinoController(BaseController):
         for attempt in range(self.config.retry_count):
             try:
                 async with self.session.post(
-                    f"http://{self.config.host}:{self.config.port}/pattern",
+                    f"http://{self.config.host}:{self.config.port}/",
                     json=arduino_pattern,
                 ) as response:
                     if response.status == 200:
