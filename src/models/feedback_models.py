@@ -1,6 +1,7 @@
 """
 Feedback and learning data models for the OpenAI agent pipeline.
 """
+
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -11,6 +12,7 @@ from .data_models import UserInput, Emotion
 
 class UserFeedback(BaseModel):
     """User feedback on emotion responses."""
+
     id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=datetime.now)
     user_input: UserInput
@@ -22,6 +24,7 @@ class UserFeedback(BaseModel):
 
 class EmotionPattern(BaseModel):
     """Learned pattern connecting stimulus to emotion."""
+
     touched_area: str
     stimulus_intensity: float
     emotion_values: Dict[str, float]
@@ -31,6 +34,7 @@ class EmotionPattern(BaseModel):
 
 class LearningData(BaseModel):
     """Collection of feedback and learned patterns."""
+
     feedback_history: List[UserFeedback] = []
     emotion_patterns: List[EmotionPattern] = []
     last_updated: datetime = Field(default_factory=datetime.now)

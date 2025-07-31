@@ -1256,6 +1256,11 @@ dev = [
     { name = "pytest" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "black" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.8.5" },
@@ -1268,6 +1273,9 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.44.1" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "black", specifier = ">=25.1.0" }]
 
 [[package]]
 name = "types-requests"

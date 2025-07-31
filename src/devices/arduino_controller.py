@@ -114,7 +114,7 @@ class ArduinoController(BaseController):
         self.connected = False
         self.logger.info("Arduinoデバイスから切断しました")
         return True
-    
+
     async def send_pattern(self, pattern: VibrationPattern) -> bool:
         """
         振動パターンをArduinoデバイスに送信します。
@@ -152,11 +152,15 @@ class ArduinoController(BaseController):
                         )
 
             except aiohttp.ClientError as e:
-                self.logger.error(f"パターン送信中にネットワークエラーが発生しました: {str(e)}")
+                self.logger.error(
+                    f"パターン送信中にネットワークエラーが発生しました: {str(e)}"
+                )
             except asyncio.TimeoutError:
                 self.logger.error("パターン送信がタイムアウトしました")
             except Exception as e:
-                self.logger.error(f"パターン送信中に予期しないエラーが発生しました: {str(e)}")
+                self.logger.error(
+                    f"パターン送信中に予期しないエラーが発生しました: {str(e)}"
+                )
 
             if attempt < self.config.retry_count - 1:
                 self.logger.info(
