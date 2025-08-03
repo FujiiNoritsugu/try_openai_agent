@@ -6,6 +6,7 @@ import streamlit as st
 
 from ...models.data_models import Emotion
 from ...devices.pipeline_integration import haptic_feedback
+from ...devices.serial_controller import SerialController
 from ..utils.async_utils import run_async
 
 
@@ -16,7 +17,7 @@ def display_device_settings_page() -> None:
     st.markdown(
         """
     このページでは、触覚フィードバックデバイスの設定を行います。
-    Arduino Uno R4 WiFiデバイスのIPアドレスとポートを設定し、
+    Arduino Uno R4デバイスとUSBシリアル接続を通じて、
     感情分析結果に基づいた振動パターンを送信できるようにします。
     """
     )
@@ -47,13 +48,13 @@ def display_registered_devices() -> None:
         st.subheader("登録済みデバイス")
 
         for i, device in enumerate(st.session_state.haptic_devices):
+            port_display = device.get('port', '自動検出')
             with st.expander(
-                f"デバイス {i+1}: {device['device_id']} ({device['host']}:{device['port']})"
+                f"デバイス {i+1}: {device['device_id']} (ポート: {port_display})"
             ):
                 st.write(f"デバイスID: {device['device_id']}")
-                st.write(f"ホスト: {device['host']}")
-                st.write(f"ポート: {device['port']}")
-                st.write(f"WebSocketパス: {device.get('ws_path', '/ws')}")
+                st.write(f"シリアルポート: {port_display}")
+                st.write(f"ボーレート: {device.get('baudrate', 115200)}")
 
                 if st.button(f"デバイス {i+1} を削除", key=f"delete_device_{i}"):
                     st.session_state.haptic_devices.pop(i)
@@ -68,23 +69,62 @@ def display_registered_devices() -> None:
 def add_device_form() -> None:
     """デバイス追加フォームを表示する"""
     st.subheader("デバイスを追加")
-
+    
+    # 利用可能なポートを検出
+    import serial.tools.list_ports
+    all_ports = list(serial.tools.list_ports.comports())
+    available_ports = SerialController.find_arduino_ports()
+    
+    # すべてのポート情報を表示
+    with st.expander("シリアルポート情報", expanded=False):
+        if all_ports:
+            st.write("検出されたすべてのシリアルポート:")
+            for port in all_ports:
+                st.write(f"- **{port.device}**: {port.description} (HWID: {port.hwid})")
+        else:
+            st.write("シリアルポートが検出されませんでした")
+    
     with st.form("add_device_form"):
         device_id = st.text_input(
             "デバイスID", value=f"device{len(st.session_state.haptic_devices) + 1}"
         )
-        host = st.text_input("ホスト (IPアドレス)", value="192.168.1.100")
-        port = st.number_input("ポート", value=80, min_value=1, max_value=65535)
-        ws_path = st.text_input("WebSocketパス", value="/ws")
+        
+        # ポート選択
+        # すべてのポートをオプションに追加
+        all_port_names = [port.device for port in all_ports]
+        port_options = ["自動検出"] + all_port_names
+        
+        if available_ports:
+            st.success(f"推奨Arduinoポート: {', '.join(available_ports)}")
+        elif all_port_names:
+            st.warning(f"自動検出できませんでした。利用可能なポート: {', '.join(all_port_names)}")
+        
+        port_selection = st.selectbox("シリアルポート", options=port_options)
+        manual_port = st.text_input(
+            "手動でポートを指定（オプション）",
+            placeholder="例: COM3, /dev/ttyUSB0",
+            help="上記のリストにない場合はここに入力"
+        )
+        
+        baudrate = st.number_input(
+            "ボーレート", value=115200, min_value=9600, max_value=115200
+        )
 
         submitted = st.form_submit_button("デバイスを追加")
 
         if submitted:
+            # ポートの決定
+            if manual_port:
+                port = manual_port
+            elif port_selection != "自動検出":
+                port = port_selection
+            else:
+                port = None  # 自動検出
+            
             new_device = {
                 "device_id": device_id,
-                "host": host,
                 "port": port,
-                "ws_path": ws_path,
+                "baudrate": baudrate,
             }
 
             st.session_state.haptic_devices.append(new_device)
@@ -106,6 +146,10 @@ def test_device_connection() -> None:
             if initialized:
                 st.session_state.haptic_initialized = True
                 st.success("すべてのデバイスに正常に接続しました")
+                
+                # ログを表示（デバッグ用）
+                with st.expander("接続ログ", expanded=False):
+                    st.text("接続ログはコンソールを確認してください")
 
                 status = run_async(haptic_feedback.get_all_device_status())
 
@@ -113,8 +157,9 @@ def test_device_connection() -> None:
                     st.subheader("デバイスの状態")
                     for device_id, device_status in status.items():
                         if device_status:
+                            state_text = "接続済み" if device_status.device_state == "connected" else "切断"
                             st.write(
-                                f"デバイス '{device_id}': {device_status.device_state}"
+                                f"デバイス '{device_id}': {state_text}"
                             )
                         else:
                             st.warning(
@@ -122,8 +167,22 @@ def test_device_connection() -> None:
                             )
             else:
                 st.error(
-                    "デバイス接続に失敗しました。ホストとポートの設定を確認してください。"
+                    "デバイス接続に失敗しました。"
                 )
+                st.warning(
+                    """
+                    **トラブルシューティング:**
+                    1. ArduinoがUSBで接続されていることを確認
+                    2. Arduino IDEのシリアルモニターが開いていないことを確認
+                    3. 正しいポートが選択されていることを確認
+                    4. Arduinoに正しいスケッチがアップロードされていることを確認
+                    5. Windowsの場合、デバイスマネージャーでCOMポートを確認
+                    """
+                )
+                
+                # ポートの再スキャンボタン
+                if st.button("ポートを再スキャン"):
+                    st.rerun()
 
 
 def test_vibration_patterns() -> None:
@@ -153,7 +212,7 @@ def test_vibration_patterns() -> None:
             )
 
             results = run_async(
-                haptic_feedback.websocket_manager.send_to_all(emotion, emotion_category)
+                haptic_feedback.serial_manager.send_to_all(emotion, emotion_category)
             )
 
             if results:

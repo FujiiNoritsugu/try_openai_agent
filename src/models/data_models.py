@@ -9,10 +9,10 @@ from typing import Optional, Dict, Any, List
 class Emotion(BaseModel):
     """喜び、楽しさ、怒り、悲しみの値を持つ感情パラメータモデル。"""
 
-    joy: int
-    fun: int
-    anger: int
-    sad: int
+    joy: float
+    fun: float
+    anger: float
+    sad: float
 
 
 class UserInput(BaseModel):
@@ -47,3 +47,9 @@ class PipelineContext(BaseModel):
     modified_message: str = ""  # エージェント3が生成した最終メッセージ
     is_learned_response: bool = False  # 学習データに基づいた応答かどうか
     metadata: Dict[str, Any] = {}  # 追加のメタデータ
+
+
+class DeviceStatus(BaseModel):
+    """デバイスの状態を表すモデル。"""
+    
+    device_state: str  # "connected", "disconnected", "connecting" など
