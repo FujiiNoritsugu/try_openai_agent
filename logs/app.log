@@ -5,3 +5,67 @@
 2025-08-01 06:00:54,649 - WebSocketController - ERROR - WebSocket接続中にネットワークエラーが発生しました: 200, message='Invalid response status', url='ws://192.168.43.166/ws'
 2025-08-01 06:00:54,650 - src.devices.pipeline_integration - WARNING - デバイス 'device1' への接続に失敗しました
 2025-08-01 06:00:54,651 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 0）
+2025-08-05 05:30:29,523 - src.devices.pipeline_integration - INFO - 1台のデバイスで触覚フィードバックシステムを初期化中
+2025-08-05 05:30:29,526 - WebSocketControllerManager - INFO - WebSocketコントローラーを登録しました: device1
+2025-08-05 05:30:29,530 - WebSocketController - INFO - WebSocket経由でArduinoデバイスに接続中: ws://192.168.43.166:80/ws
+2025-08-05 05:30:35,318 - WebSocketController - ERROR - WebSocket接続がタイムアウトしました
+2025-08-05 05:30:35,319 - src.devices.pipeline_integration - WARNING - デバイス 'device1' への接続に失敗しました
+2025-08-05 05:30:35,319 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 0）
+2025-08-05 05:31:34,368 - src.devices.pipeline_integration - WARNING - 触覚フィードバックシステムは既に初期化されています
+2025-08-05 05:31:34,374 - src.devices.pipeline_integration - INFO - すべてのデバイスの状態を取得中
+2025-08-05 05:31:34,374 - WebSocketController - WARNING - 状態を取得できません: WebSocket接続がありません
+2025-08-05 05:50:13,740 - src.devices.pipeline_integration - INFO - 1台のデバイスで触覚フィードバックシステムを初期化中
+2025-08-05 05:50:13,741 - ArduinoControllerManager - INFO - Arduinoコントローラーを登録しました: device1
+2025-08-05 05:50:13,746 - ArduinoController - INFO - Arduinoデバイスに接続中: 192.168.43.166:80
+2025-08-05 05:50:13,923 - ArduinoController - INFO - Arduinoデバイスに接続しました
+2025-08-05 05:50:13,924 - src.devices.pipeline_integration - INFO - デバイス 'device1' に正常に接続しました
+2025-08-05 05:50:13,924 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 1）
+2025-08-05 05:50:13,926 - src.devices.pipeline_integration - INFO - すべてのデバイスの状態を取得中
+2025-08-05 05:50:13,928 - src.devices.pipeline_integration - ERROR - デバイス状態取得中にエラーが発生しました: 'ArduinoControllerManager' object has no attribute 'get_all_status'
+2025-08-05 05:53:31,756 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f259da3cf80>
+2025-08-05 05:53:55,446 - src.devices.pipeline_integration - INFO - 1台のデバイスで触覚フィードバックシステムを初期化中
+2025-08-05 05:53:55,446 - ArduinoControllerManager - INFO - Arduinoコントローラーを登録しました: device1
+2025-08-05 05:53:55,447 - ArduinoController - INFO - Arduinoデバイスに接続中: 192.168.43.166:80
+2025-08-05 05:53:55,726 - ArduinoController - INFO - Arduinoデバイスに接続しました
+2025-08-05 05:53:55,726 - src.devices.pipeline_integration - INFO - デバイス 'device1' に正常に接続しました
+2025-08-05 05:53:55,727 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 1）
+2025-08-05 05:53:55,730 - src.devices.pipeline_integration - INFO - すべてのデバイスの状態を取得中
+2025-08-05 05:53:55,731 - ArduinoController - INFO - デバイスステータスを取得中
+2025-08-05 05:53:55,732 - ArduinoController - ERROR - ステータス取得中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 05:56:40,331 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7ff644378b00>
+2025-08-05 05:57:02,402 - src.devices.pipeline_integration - INFO - 1台のデバイスで触覚フィードバックシステムを初期化中
+2025-08-05 05:57:02,405 - ArduinoControllerManager - INFO - Arduinoコントローラーを登録しました: device1
+2025-08-05 05:57:02,407 - ArduinoController - INFO - Arduinoデバイスに接続中: 192.168.43.166:80
+2025-08-05 05:57:02,709 - ArduinoController - INFO - Arduinoデバイスに接続しました
+2025-08-05 05:57:02,710 - src.devices.pipeline_integration - INFO - デバイス 'device1' に正常に接続しました
+2025-08-05 05:57:02,710 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 1）
+2025-08-05 05:57:02,713 - src.devices.pipeline_integration - INFO - すべてのデバイスの状態を取得中
+2025-08-05 05:57:02,713 - ArduinoController - INFO - デバイスステータスを取得中
+2025-08-05 05:57:02,714 - ArduinoController - ERROR - ステータス取得中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 05:57:13,657 - ArduinoController - INFO - パターンをArduinoデバイスに送信中: {"steps": [{"intensity": 60, "duration": 200}, {"intensity": 70, "duration": 200}, {"intensity": 60, "duration": 200}], "interval": 100, "repeat_count": 3}
+2025-08-05 05:57:13,661 - ArduinoController - ERROR - パターン送信中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 05:57:13,662 - ArduinoController - INFO - 再試行中... (1/3)
+2025-08-05 05:57:14,664 - ArduinoController - ERROR - パターン送信中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 05:57:14,665 - ArduinoController - INFO - 再試行中... (2/3)
+2025-08-05 05:57:15,667 - ArduinoController - ERROR - パターン送信中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 06:00:01,273 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fb30b58c620>
+2025-08-05 06:00:24,443 - src.devices.pipeline_integration - INFO - 1台のデバイスで触覚フィードバックシステムを初期化中
+2025-08-05 06:00:24,444 - ArduinoControllerManager - INFO - Arduinoコントローラーを登録しました: device1
+2025-08-05 06:00:24,445 - ArduinoController - INFO - Arduinoデバイスに接続中: 192.168.43.166:80
+2025-08-05 06:00:24,643 - ArduinoController - INFO - Arduinoデバイスに接続しました
+2025-08-05 06:00:24,644 - src.devices.pipeline_integration - INFO - デバイス 'device1' に正常に接続しました
+2025-08-05 06:00:24,645 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 1）
+2025-08-05 06:00:24,647 - src.devices.pipeline_integration - INFO - すべてのデバイスの状態を取得中
+2025-08-05 06:00:24,647 - ArduinoController - INFO - デバイスステータスを取得中
+2025-08-05 06:00:24,647 - ArduinoController - ERROR - ステータス取得中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 06:00:32,401 - ArduinoController - INFO - パターンをArduinoデバイスに送信中: {"steps": [{"intensity": 60, "duration": 200}, {"intensity": 70, "duration": 200}, {"intensity": 60, "duration": 200}], "interval": 100, "repeat_count": 3}
+2025-08-05 06:00:32,402 - ArduinoController - ERROR - パターン送信中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 06:00:32,406 - ArduinoController - INFO - 再試行中... (1/3)
+2025-08-05 06:00:33,408 - ArduinoController - ERROR - パターン送信中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 06:00:33,408 - ArduinoController - INFO - 再試行中... (2/3)
+2025-08-05 06:00:34,410 - ArduinoController - ERROR - パターン送信中に予期しないエラーが発生しました: Timeout context manager should be used inside a task
+2025-08-05 06:00:58,345 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f2139c98650>

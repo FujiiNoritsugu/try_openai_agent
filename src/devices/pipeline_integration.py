@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List, Tuple
 
 from ..models.data_models import PipelineContext, Emotion
 from ..pipeline.pipeline import run_pipeline, format_pipeline_results
-from .websocket_controller import WebSocketController, WebSocketControllerManager
+from .arduino_controller import ArduinoController, ArduinoControllerManager
 
 
 class HapticFeedbackIntegration:
@@ -20,20 +20,20 @@ class HapticFeedbackIntegration:
     感情分析パイプラインと触覚フィードバックデバイスを統合するクラス
 
     このクラスは、感情分析パイプラインの結果を処理し、
-    WebSocketコントローラーを通じて適切な振動パターンを
+    HTTPを通じて適切な振動パターンを
     触覚フィードバックデバイスに送信します。
     """
 
-    def __init__(self, websocket_manager: Optional[WebSocketControllerManager] = None):
+    def __init__(self, arduino_manager: Optional[ArduinoControllerManager] = None):
         """
         HapticFeedbackIntegrationを初期化します。
 
         引数:
-            websocket_manager: WebSocketコントローラーマネージャー。
+            arduino_manager: Arduinoコントローラーマネージャー。
                               指定しない場合は新しいインスタンスが作成されます。
         """
         self.logger = logging.getLogger(__name__)
-        self.websocket_manager = websocket_manager or WebSocketControllerManager()
+        self.arduino_manager = arduino_manager or ArduinoControllerManager()
         self.connected_devices: set[str] = set()
         self.is_initialized = False
 
@@ -46,7 +46,6 @@ class HapticFeedbackIntegration:
                 - device_id: デバイスの識別子
                 - host: デバイスのホストアドレス
                 - port: デバイスのポート（オプション、デフォルト: 80）
-                - ws_path: WebSocketのパス（オプション、デフォルト: "/ws"）
 
         戻り値:
             初期化が成功した場合はTrue、それ以外の場合はFalse
@@ -64,19 +63,18 @@ class HapticFeedbackIntegration:
                 device_id = config.get("device_id")
                 host = config.get("host")
                 port = config.get("port", 80)
-                ws_path = config.get("ws_path", "/ws")
 
                 if not device_id or not host:
                     self.logger.error(f"無効なデバイス設定: {config}")
                     continue
 
-                self.websocket_manager.register_controller(
-                    device_id, host, port, ws_path
+                self.arduino_manager.register_controller(
+                    device_id, host, port
                 )
                 self.connected_devices.add(device_id)
 
             if self.connected_devices:
-                connection_results = await self.websocket_manager.connect_all()
+                connection_results = await self.arduino_manager.connect_all()
 
                 for device_id, success in connection_results.items():
                     if success:
@@ -116,9 +114,9 @@ class HapticFeedbackIntegration:
         self.logger.info("触覚フィードバックシステムをシャットダウン中")
 
         try:
-            await self.websocket_manager.stop_all()
+            await self.arduino_manager.stop_all()
 
-            disconnect_results = await self.websocket_manager.disconnect_all()
+            disconnect_results = await self.arduino_manager.disconnect_all()
 
             for device_id, success in disconnect_results.items():
                 if success:
@@ -166,7 +164,7 @@ class HapticFeedbackIntegration:
         )
 
         try:
-            results = await self.websocket_manager.process_pipeline_context(ctx)
+            results = await self.arduino_manager.process_pipeline_context(ctx)
 
             for device_id, success in results.items():
                 if success:
@@ -242,7 +240,7 @@ class HapticFeedbackIntegration:
         self.logger.info("すべてのデバイスの振動を停止中")
 
         try:
-            results = await self.websocket_manager.stop_all()
+            results = await self.arduino_manager.stop_all()
 
             for device_id, success in results.items():
                 if success:
@@ -274,7 +272,7 @@ class HapticFeedbackIntegration:
         self.logger.info("すべてのデバイスの状態を取得中")
 
         try:
-            return await self.websocket_manager.get_all_status()
+            return await self.arduino_manager.get_all_status()
 
         except Exception as e:
             self.logger.error(f"デバイス状態取得中にエラーが発生しました: {str(e)}")

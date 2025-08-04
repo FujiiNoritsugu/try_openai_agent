@@ -53,7 +53,6 @@ def display_registered_devices() -> None:
                 st.write(f"デバイスID: {device['device_id']}")
                 st.write(f"ホスト: {device['host']}")
                 st.write(f"ポート: {device['port']}")
-                st.write(f"WebSocketパス: {device.get('ws_path', '/ws')}")
 
                 if st.button(f"デバイス {i+1} を削除", key=f"delete_device_{i}"):
                     st.session_state.haptic_devices.pop(i)
@@ -75,7 +74,6 @@ def add_device_form() -> None:
         )
         host = st.text_input("ホスト (IPアドレス)", value="192.168.1.100")
         port = st.number_input("ポート", value=80, min_value=1, max_value=65535)
-        ws_path = st.text_input("WebSocketパス", value="/ws")
 
         submitted = st.form_submit_button("デバイスを追加")
 
@@ -84,7 +82,6 @@ def add_device_form() -> None:
                 "device_id": device_id,
                 "host": host,
                 "port": port,
-                "ws_path": ws_path,
             }
 
             st.session_state.haptic_devices.append(new_device)
@@ -113,9 +110,12 @@ def test_device_connection() -> None:
                     st.subheader("デバイスの状態")
                     for device_id, device_status in status.items():
                         if device_status:
-                            st.write(
-                                f"デバイス '{device_id}': {device_status.device_state}"
-                            )
+                            connected = device_status.get("connected", False)
+                            playing = device_status.get("playing", False)
+                            state = "接続中" if connected else "切断"
+                            if connected and playing:
+                                state += " (再生中)"
+                            st.write(f"デバイス '{device_id}': {state}")
                         else:
                             st.warning(
                                 f"デバイス '{device_id}' の状態を取得できませんでした"
@@ -141,19 +141,19 @@ def test_vibration_patterns() -> None:
         }.get(x, x),
     )
 
-    intensity = st.slider("感情強度", min_value=0.0, max_value=1.0, value=0.7, step=0.1)
+    intensity = st.slider("感情強度", min_value=0, max_value=5, value=3, step=1)
 
     if st.button("テストパターンを送信"):
         with st.spinner("振動パターンを送信中..."):
             emotion = Emotion(
-                joy=intensity if emotion_category == "joy" else 0.1,
-                fun=intensity if emotion_category == "pleasure" else 0.1,
-                anger=intensity if emotion_category == "anger" else 0.1,
-                sad=intensity if emotion_category == "sorrow" else 0.1,
+                joy=intensity if emotion_category == "joy" else 1,
+                fun=intensity if emotion_category == "pleasure" else 1,
+                anger=intensity if emotion_category == "anger" else 1,
+                sad=intensity if emotion_category == "sorrow" else 1,
             )
 
             results = run_async(
-                haptic_feedback.websocket_manager.send_to_all(emotion, emotion_category)
+                haptic_feedback.arduino_manager.send_to_all(emotion, emotion_category)
             )
 
             if results:

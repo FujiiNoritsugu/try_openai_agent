@@ -144,9 +144,9 @@ class BaseController(ABC):
     async def _ensure_session(self) -> None:
         """セッションが存在することを確認します。"""
         if not self.session:
-            self.session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout)
-            )
+            # Streamlitの環境でタイムアウトエラーを回避するため、
+            # タイムアウトをリクエストごとに設定
+            self.session = aiohttp.ClientSession()
             self._session_owner = True
 
     def _convert_pattern_to_arduino_format(

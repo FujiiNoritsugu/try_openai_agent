@@ -66,6 +66,7 @@ class ArduinoController(BaseController):
         try:
             await self._ensure_session()
 
+            # タイムアウトを使わずに接続テスト
             async with self.session.get(
                 f"http://{self.config.host}:{self.config.port}/status"
             ) as response:
@@ -125,11 +126,14 @@ class ArduinoController(BaseController):
         戻り値:
             送信が成功した場合はTrue、それ以外の場合はFalse
         """
-        if not self.connected or not self.session:
+        if not self.connected:
             self.logger.warning(
                 "パターンを送信できません: デバイスに接続されていません"
             )
             return False
+        
+        # セッションを確保
+        await self._ensure_session()
 
         arduino_pattern = self._convert_pattern_to_arduino_format(pattern)
 
@@ -141,7 +145,7 @@ class ArduinoController(BaseController):
             try:
                 async with self.session.post(
                     f"http://{self.config.host}:{self.config.port}/",
-                    json=arduino_pattern,
+                    json=arduino_pattern
                 ) as response:
                     if response.status == 200:
                         self.logger.info("パターンが正常に送信されました")
@@ -169,6 +173,98 @@ class ArduinoController(BaseController):
                 await asyncio.sleep(self.config.retry_delay)
 
         return False
+
+    async def stop(self) -> bool:
+        """
+        現在再生中の振動パターンを停止します。
+
+        戻り値:
+            停止が成功した場合はTrue、それ以外の場合はFalse
+        """
+        if not self.connected:
+            self.logger.warning(
+                "停止コマンドを送信できません: デバイスに接続されていません"
+            )
+            return False
+
+        self.logger.info("振動を停止中")
+
+        try:
+            # セッションを確保
+            await self._ensure_session()
+            
+            async with self.session.post(
+                f"http://{self.config.host}:{self.config.port}/stop"
+            ) as response:
+                if response.status == 200:
+                    self.logger.info("振動が正常に停止されました")
+                    return True
+                else:
+                    self.logger.warning(
+                        f"振動停止に失敗しました: {response.status}"
+                    )
+                    return False
+
+        except aiohttp.ClientError as e:
+            self.logger.error(
+                f"振動停止中にネットワークエラーが発生しました: {str(e)}"
+            )
+            return False
+        except asyncio.TimeoutError:
+            self.logger.error("振動停止がタイムアウトしました")
+            return False
+        except Exception as e:
+            self.logger.error(
+                f"振動停止中に予期しないエラーが発生しました: {str(e)}"
+            )
+            return False
+
+    async def get_status(self) -> Optional[Dict[str, Any]]:
+        """
+        デバイスの現在の状態を取得します。
+
+        戻り値:
+            状態情報を含む辞書、取得失敗時はNone
+        """
+        if not self.connected:
+            self.logger.warning(
+                "ステータスを取得できません: デバイスに接続されていません"
+            )
+            return None
+
+        self.logger.info("デバイスステータスを取得中")
+
+        try:
+            # セッションを確保
+            await self._ensure_session()
+            
+            # タイムアウトを使わずに接続テスト
+            async with self.session.get(
+                f"http://{self.config.host}:{self.config.port}/status"
+            ) as response:
+                if response.status == 200:
+                    status = await response.json()
+                    self.logger.info(f"ステータス取得成功: {status}")
+                    return status
+                else:
+                    self.logger.warning(
+                        f"ステータス取得に失敗しました: {response.status}"
+                    )
+                    return None
+
+        except aiohttp.ClientError as e:
+            self.logger.error(
+                f"ステータス取得中にネットワークエラーが発生しました: {str(e)}"
+            )
+            return None
+        except asyncio.TimeoutError:
+            self.logger.error("ステータス取得がタイムアウトしました")
+            return None
+        except Exception as e:
+            self.logger.error(
+                f"ステータス取得中に予期しないエラーが発生しました: {str(e)}"
+            )
+            return None
 
 
 class ArduinoControllerManager(BaseControllerManager):
@@ -198,3 +294,58 @@ class ArduinoControllerManager(BaseControllerManager):
         self.controllers[device_id] = controller
         self.logger.info(f"Arduinoコントローラーを登録しました: {device_id}")
         return controller
+
+    async def get_all_status(self) -> Dict[str, Any]:
+        """
+        すべてのデバイスのステータスを取得します。
+
+        戻り値:
+            デバイスIDとステータスをマッピングした辞書
+        """
+        results = {}
+        tasks = []
+
+        for device_id, controller in self.controllers.items():
+            task = asyncio.create_task(controller.get_status())
+            tasks.append((device_id, task))
+
+        for device_id, task in tasks:
+            status = await task
+            if status:
+                results[device_id] = status
+            else:
+                results[device_id] = {"connected": False, "playing": False}
+
+        return results
+
+    async def send_to_all(self, emotion: Emotion, emotion_category: str) -> Dict[str, bool]:
+        """
+        すべてのデバイスに感情ベースの振動パターンを送信します。
+
+        引数:
+            emotion: 感情データ
+            emotion_category: 感情カテゴリ
+
+        戻り値:
+            デバイスIDと送信成功状態をマッピングした辞書
+        """
+        from ..models.data_models import PipelineContext, UserInput
+        
+        # PipelineContextを作成
+        ctx = PipelineContext(
+            user_input=UserInput(data="test", touched_area="test", gender="その他"),
+            emotion=emotion,
+            emotion_category=emotion_category
+        )
+        
+        results = {}
+        tasks = []
+
+        for device_id, controller in self.controllers.items():
+            task = asyncio.create_task(controller.process_pipeline_context(ctx))
+            tasks.append((device_id, task))
+
+        for device_id, task in tasks:
+            results[device_id] = await task
+
+        return results
