@@ -165,12 +165,3 @@ def test_vibration_patterns() -> None:
                         st.warning(f"デバイス '{device_id}' への送信に失敗しました")
             else:
                 st.error("テストパターンの送信に失敗しました")
-
-    if st.button("振動を停止"):
-        with st.spinner("振動を停止中..."):
-            results = run_async(haptic_feedback.stop_all_devices())
-
-            if results:
-                st.success("振動を停止しました")
-            else:
-                st.error("振動停止に失敗しました")

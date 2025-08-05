@@ -64,38 +64,34 @@ class ArduinoController(BaseController):
         )
 
         try:
-            await self._ensure_session()
-
-            # タイムアウトを使わずに接続テスト
-            async with self.session.get(
-                f"http://{self.config.host}:{self.config.port}/status"
-            ) as response:
-                if response.status == 200:
-                    self.connected = True
-                    self.logger.info("Arduinoデバイスに接続しました")
-                    return True
-                else:
-                    self.logger.error(
-                        f"Arduinoデバイスへの接続に失敗しました: {response.status}"
-                    )
-                    await self._cleanup_session()
-                    return False
+            # 各リクエストで新しいセッションを作成
+            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    f"http://{self.config.host}:{self.config.port}/status"
+                ) as response:
+                    if response.status == 200:
+                        self.connected = True
+                        self.logger.info("Arduinoデバイスに接続しました")
+                        return True
+                    else:
+                        self.logger.error(
+                            f"Arduinoデバイスへの接続に失敗しました: {response.status}"
+                        )
+                        return False
 
         except aiohttp.ClientError as e:
             self.logger.error(
                 f"Arduinoデバイスへの接続中にネットワークエラーが発生しました: {str(e)}"
             )
-            await self._cleanup_session()
             return False
         except asyncio.TimeoutError:
             self.logger.error("Arduinoデバイスへの接続がタイムアウトしました")
-            await self._cleanup_session()
             return False
         except Exception as e:
             self.logger.error(
                 f"Arduinoデバイスへの接続中に予期しないエラーが発生しました: {str(e)}"
             )
-            await self._cleanup_session()
             return False
 
     async def disconnect(self) -> bool:
@@ -132,9 +128,6 @@ class ArduinoController(BaseController):
             )
             return False
         
-        # セッションを確保
-        await self._ensure_session()
-
         arduino_pattern = self._convert_pattern_to_arduino_format(pattern)
 
         self.logger.info(
@@ -143,17 +136,20 @@ class ArduinoController(BaseController):
 
         for attempt in range(self.config.retry_count):
             try:
-                async with self.session.post(
-                    f"http://{self.config.host}:{self.config.port}/",
-                    json=arduino_pattern
-                ) as response:
-                    if response.status == 200:
-                        self.logger.info("パターンが正常に送信されました")
-                        return True
-                    else:
-                        self.logger.warning(
-                            f"パターン送信に失敗しました: {response.status}"
-                        )
+                # 各リクエストで新しいセッションを作成
+                timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(
+                        f"http://{self.config.host}:{self.config.port}/pattern",
+                        json=arduino_pattern
+                    ) as response:
+                        if response.status == 200:
+                            self.logger.info("パターンが正常に送信されました")
+                            return True
+                        else:
+                            self.logger.warning(
+                                f"パターン送信に失敗しました: {response.status}"
+                            )
 
             except aiohttp.ClientError as e:
                 self.logger.error(
@@ -190,20 +186,20 @@ class ArduinoController(BaseController):
         self.logger.info("振動を停止中")
 
         try:
-            # セッションを確保
-            await self._ensure_session()
-            
-            async with self.session.post(
-                f"http://{self.config.host}:{self.config.port}/stop"
-            ) as response:
-                if response.status == 200:
-                    self.logger.info("振動が正常に停止されました")
-                    return True
-                else:
-                    self.logger.warning(
-                        f"振動停止に失敗しました: {response.status}"
-                    )
-                    return False
+            # 各リクエストで新しいセッションを作成
+            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    f"http://{self.config.host}:{self.config.port}/stop"
+                ) as response:
+                    if response.status == 200:
+                        self.logger.info("振動が正常に停止されました")
+                        return True
+                    else:
+                        self.logger.warning(
+                            f"振動停止に失敗しました: {response.status}"
+                        )
+                        return False
 
         except aiohttp.ClientError as e:
             self.logger.error(
@@ -235,22 +231,21 @@ class ArduinoController(BaseController):
         self.logger.info("デバイスステータスを取得中")
 
         try:
-            # セッションを確保
-            await self._ensure_session()
-            
-            # タイムアウトを使わずに接続テスト
-            async with self.session.get(
-                f"http://{self.config.host}:{self.config.port}/status"
-            ) as response:
-                if response.status == 200:
-                    status = await response.json()
-                    self.logger.info(f"ステータス取得成功: {status}")
-                    return status
-                else:
-                    self.logger.warning(
-                        f"ステータス取得に失敗しました: {response.status}"
-                    )
-                    return None
+            # 各リクエストで新しいセッションを作成
+            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    f"http://{self.config.host}:{self.config.port}/status"
+                ) as response:
+                    if response.status == 200:
+                        status = await response.json()
+                        self.logger.info(f"ステータス取得成功: {status}")
+                        return status
+                    else:
+                        self.logger.warning(
+                            f"ステータス取得に失敗しました: {response.status}"
+                        )
+                        return None
 
         except aiohttp.ClientError as e:
             self.logger.error(
@@ -343,6 +338,25 @@ class ArduinoControllerManager(BaseControllerManager):
 
         for device_id, controller in self.controllers.items():
             task = asyncio.create_task(controller.process_pipeline_context(ctx))
+            tasks.append((device_id, task))
+
+        for device_id, task in tasks:
+            results[device_id] = await task
+
+        return results
+    
+    async def stop_all(self) -> Dict[str, bool]:
+        """
+        すべてのデバイスの振動を停止します。
+
+        戻り値:
+            デバイスIDと停止成功状態をマッピングした辞書
+        """
+        results = {}
+        tasks = []
+
+        for device_id, controller in self.controllers.items():
+            task = asyncio.create_task(controller.stop_vibration())
             tasks.append((device_id, task))
 
         for device_id, task in tasks:
