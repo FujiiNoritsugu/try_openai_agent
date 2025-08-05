@@ -27,5 +27,5 @@ python -m src.main
 #### StreamlitのUIを使用した実行
 
 ```
-streamlit run app.py
+uv run streamlit run app.py
 ```

@@ -276,10 +276,12 @@ void checkClientConnection() {
     
     // HTTPリクエストの解析
     String requestLine = "";
+    String requestPath = "";
     String currentLine = "";
     String jsonData = "";
     int contentLength = 0;
     bool isPost = false;
+    bool isGet = false;
     bool headerComplete = false;
     unsigned long requestStartTime = millis();
     
@@ -289,11 +291,20 @@ void checkClientConnection() {
         
         if (!headerComplete) {
           if (c == '\n') {
-            // 最初の行でHTTPメソッドを確認
+            // 最初の行でHTTPメソッドとパスを確認
             if (requestLine.length() == 0) {
               requestLine = currentLine;
               if (requestLine.startsWith("POST")) {
                 isPost = true;
+              } else if (requestLine.startsWith("GET")) {
+                isGet = true;
+              }
+              
+              // パスの抽出
+              int firstSpace = requestLine.indexOf(' ');
+              int secondSpace = requestLine.indexOf(' ', firstSpace + 1);
+              if (firstSpace != -1 && secondSpace != -1) {
+                requestPath = requestLine.substring(firstSpace + 1, secondSpace);
               }
             }
             
@@ -340,8 +351,23 @@ void checkClientConnection() {
     client.println("Access-Control-Allow-Origin: *");
     client.println();
     
-    // JSONデータの処理
-    if (jsonData.length() > 0) {
+    // リクエストパスに基づいて処理
+    if (requestPath == "/status" && isGet) {
+      // ステータスレスポンスの送信
+      sendStatusResponse();
+    } else if (requestPath == "/pattern" && isPost && jsonData.length() > 0) {
+      // 振動パターンの処理
+      if (parseVibrationPattern(jsonData)) {
+        client.println("{\"status\":\"ok\",\"message\":\"Pattern received\"}");
+      } else {
+        client.println("{\"status\":\"error\",\"message\":\"Invalid pattern\"}");
+      }
+    } else if (requestPath == "/stop" && isPost) {
+      // 振動の停止
+      vibrationController.stop();
+      client.println("{\"status\":\"ok\",\"message\":\"Vibration stopped\"}");
+    } else if (isPost && jsonData.length() > 0) {
+      // 旧APIとの互換性（パスなしのPOST）
       if (parseVibrationPattern(jsonData)) {
         client.println("{\"status\":\"ok\",\"message\":\"Pattern received\"}");
       } else {
@@ -355,6 +381,36 @@ void checkClientConnection() {
     client.stop();
     Serial.println("クライアント切断");
   }
+}
+
+/**
+ * ステータスレスポンスを送信する
+ */
+void sendStatusResponse() {
+  // ステータス情報のJSONを作成
+  String response = "{";
+  response += "\"status\":\"ok\",";
+  response += "\"device_state\":\"";
+  
+  if (vibrationController.isPlaying()) {
+    response += "playing";
+  } else {
+    response += "idle";
+  }
+  
+  response += "\",";
+  response += "\"is_playing\":";
+  response += vibrationController.isPlaying() ? "true" : "false";
+  response += ",";
+  response += "\"wifi_connected\":";
+  response += (WiFi.status() == WL_CONNECTED) ? "true" : "false";
+  response += ",";
+  response += "\"ip_address\":\"";
+  response += WiFi.localIP().toString();
+  response += "\"";
+  response += "}";
+  
+  client.println(response);
 }
 
 /**

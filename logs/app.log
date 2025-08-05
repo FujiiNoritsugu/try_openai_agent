@@ -1,7 +1,0 @@
-2025-08-01 06:00:53,774 - src.devices.pipeline_integration - INFO - 1台のデバイスで触覚フィードバックシステムを初期化中
-2025-08-01 06:00:53,776 - WebSocketControllerManager - INFO - WebSocketコントローラーを登録しました: device1
-2025-08-01 06:00:53,779 - WebSocketController - INFO - WebSocket経由でArduinoデバイスに接続中: ws://192.168.43.166:80/ws
-2025-08-01 06:00:54,527 - WebSocketController - INFO - デバイスがオンラインです。WebSocket接続を確立します。
-2025-08-01 06:00:54,649 - WebSocketController - ERROR - WebSocket接続中にネットワークエラーが発生しました: 200, message='Invalid response status', url='ws://192.168.43.166/ws'
-2025-08-01 06:00:54,650 - src.devices.pipeline_integration - WARNING - デバイス 'device1' への接続に失敗しました
-2025-08-01 06:00:54,651 - src.devices.pipeline_integration - INFO - 触覚フィードバックシステムが初期化されました（接続済みデバイス: 0）
