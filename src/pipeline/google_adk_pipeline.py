@@ -51,15 +51,18 @@ class EmotionPipeline:
             # 学習器がない場合は通常の処理
             await self._process_emotion(user_input, ctx)
 
-        # 感情を分類する
-        emotion_category, final_message = (
-            await self.emotion_classifier.classify_emotion(
-                ctx.emotion, user_input.gender, ctx
+        # 感情を分類する（emotionがNoneでない場合のみ）
+        if ctx.emotion:
+            emotion_category, final_message = (
+                await self.emotion_classifier.classify_emotion(
+                    ctx.emotion, user_input.gender, ctx
+                )
             )
-        )
-
-        ctx.emotion_category = emotion_category
-        ctx.modified_message = final_message
+            ctx.emotion_category = emotion_category
+            ctx.modified_message = final_message
+        else:
+            ctx.emotion_category = ""
+            ctx.modified_message = "感情の抽出に失敗しました。"
 
         return ctx
 

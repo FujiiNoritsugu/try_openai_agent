@@ -3,12 +3,14 @@ Google ADKを使用した感情処理ロジック。
 """
 
 import json
+import uuid
 from typing import Optional, Tuple
 from google.adk import Runner
-from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
 from ..models.data_models import UserInput, PipelineContext, OriginalOutput, Emotion
 from ..agents.google_adk_factory import agent_factory
+from .google_adk_session_manager import session_manager
 
 
 class EmotionProcessor:
@@ -16,7 +18,8 @@ class EmotionProcessor:
 
     def __init__(self):
         self.agent_factory = agent_factory
-        self.session_service = InMemorySessionService()
+        self.session_service = session_manager.session_service
+        self.session_counter = 0
 
     async def extract_emotion(
         self, user_input: UserInput, context: PipelineContext
@@ -39,15 +42,57 @@ class EmotionProcessor:
         )
 
         # Google ADKのRunnerを使用してエージェントを実行
-        runner = Runner(agent=emotion_agent, session_service=self.session_service)
+        runner = Runner(
+            agent=emotion_agent, 
+            session_service=self.session_service,
+            app_name="emotion_pipeline"
+        )
         
         # ユーザー入力をJSON形式で送信
         input_json = json.dumps(user_input.model_dump())
-        result = await runner.run(input_json)
+        
+        # Google ADKの正しい形式でメッセージを作成
+        message = types.Content(parts=[types.Part(text=input_json)])
+        
+        # Runnerを実行
+        self.session_counter += 1
+        session_id = f"session_{self.session_counter}"
+        user_id = f"user_{user_input.gender}_{self.session_counter}"
+        
+        # セッションを事前に作成
+        try:
+            await self.session_service.create_session(
+                session_id=session_id,
+                user_id=user_id,
+                app_name="emotion_pipeline"
+            )
+        except Exception as e:
+            print(f"Session creation error: {e}")
+            # 既存のセッションがある場合は続行
+        
+        try:
+            events = list(runner.run(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=message
+            ))
+        except Exception as e:
+            print(f"Runner execution error: {e}")
+            return None, None, False
+        
+        # 最後のイベントから結果を取得
+        result = None
+        for event in events:
+            if hasattr(event, 'output'):
+                result = event
 
         # 結果を解析
         try:
-            result_data = json.loads(result.output)
+            if result and hasattr(result, 'output'):
+                result_data = json.loads(result.output)
+            else:
+                print("No output found in runner events")
+                return None, None, False
             emotion_data = result_data.get("emotion", {})
             emotion = Emotion(
                 joy=emotion_data.get("joy", 0),
