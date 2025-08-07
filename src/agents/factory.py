@@ -24,6 +24,7 @@ class AgentFactory:
                 name="EmotionExtractor",
                 instructions=AgentInstructions.EMOTION_EXTRACTOR,
                 output_type=OriginalOutput,
+                model="gpt-5",
             )
         return self._agents_cache["emotion_extractor"]
 
@@ -34,6 +35,7 @@ class AgentFactory:
                 name="JoyAgent",
                 instructions=AgentInstructions.JOY,
                 output_type=HandoffOutput,
+                model="gpt-5",
             )
         return self._agents_cache["joy"]
 
@@ -44,6 +46,7 @@ class AgentFactory:
                 name="AngerAgent",
                 instructions=AgentInstructions.ANGER,
                 output_type=HandoffOutput,
+                model="gpt-5",
             )
         return self._agents_cache["anger"]
 
@@ -54,6 +57,7 @@ class AgentFactory:
                 name="SorrowAgent",
                 instructions=AgentInstructions.SORROW,
                 output_type=HandoffOutput,
+                model="gpt-5",
             )
         return self._agents_cache["sorrow"]
 
@@ -64,6 +68,7 @@ class AgentFactory:
                 name="PleasureAgent",
                 instructions=AgentInstructions.PLEASURE,
                 output_type=HandoffOutput,
+                model="gpt-5",
             )
         return self._agents_cache["pleasure"]
 
@@ -84,6 +89,7 @@ class AgentFactory:
             instructions=AgentInstructions.CLASSIFIER,
             handoffs=handoff_agents,
             output_type=HandoffOutput,
+            model="gpt-5",
         )
 
     def create_emotion_agent_with_gender(
@@ -107,6 +113,7 @@ class AgentFactory:
             name=base_agent.name,
             instructions=base_agent.instructions.format(gender=gender),
             output_type=base_agent.output_type,
+            model="gpt-5",
         )
 
 
